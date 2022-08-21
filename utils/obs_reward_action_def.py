@@ -1,7 +1,7 @@
 class OBSRWD:
-    def __init__(self, ts):
+    def __init__(self, ts, value):
         self.id = ts
-        self.value = 0
+        self.value = value
         self.major_reward = 0
 
 class ACT:

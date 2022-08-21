@@ -7,6 +7,7 @@ import results.running_value as RV
 
 if __name__ == '__main__':
     log.logger.debug('[Line-1][Initialize env and agent]')
+    log.logger.debug('Experimental Parameters: n_episode=%d, n_time_steps=%d, agent_type=%s' % (GP.n_episode, GP.n_time_steps, GP.agent_type))
     env, agent = ENV(), None
     if GP.agent_type is 'nddqn':
         agent = NDDQN()
