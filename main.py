@@ -1,4 +1,26 @@
+from utils.logger import log
+from environment.env_main import ENV
+import utils.global_parameters as GP
+import utils.system_inner as SI
+from agent.no_delay_dqn import NDDQN
+import results.running_value as RV
 
 if __name__ == '__main__':
-    print('Hello World')
+    log.logger.debug('[Line-1][Initialize env and agent]')
+    env, agent = ENV(), None
+    if GP.agent_type is 'nddqn':
+        agent = NDDQN()
+    for ep in range(GP.n_episode):
+        env.reset()
+        agent.reset()
+        RV.episode_reward.append(0)
+        for ts in range(GP.n_time_steps):
+            log.logger.debug('[line-9][Training Episode - %d][Time Step - %d]' % (ep, ts))
+            obs_rwd = env.send_obs_reward(ts)
+            action = agent.receive_observation_s(SI.CHECK_OBSERVATIONS(ts), ts)
+            env.act(action)
+        log.logger.debug('Episode-%d reward: %f' % (ep, RV.episode_reward[-1]))
+
+
+
 
