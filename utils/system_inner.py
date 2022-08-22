@@ -19,6 +19,7 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
             for i in range(GP.n_ms_server):
                 idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_ms_server + i
                 if index == idx:
+                    log.logger.debug('changing [m,s,i,n] = [%d,%d,%d,%d]' % (m, n, i, n_threads))
                     if obs_env[idx][1] + n_threads > GP.ypi_max:
                         log.logger.debug('exceed maximum threads')
                         return False
