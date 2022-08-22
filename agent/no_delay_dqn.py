@@ -24,6 +24,7 @@ class NDDQN:
         valid_action = []
         reqs = self.receive_requests()
         obs_env = obs[0].value
+        log.logger.debug('major reward = %f' % obs[0].major_reward)
         for i in range(len(GP.msc)):
             for j in range(reqs[i]):
                 is_req_mapped_success = True

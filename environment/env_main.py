@@ -1,7 +1,7 @@
 import utils.global_parameters as GP
 from utils.obs_reward_action_def import OBSRWD
 from utils.logger import log
-
+import results.running_value as RV
 
 
 class NF:
@@ -29,7 +29,7 @@ class ENV:
                 for j in range(GP.n_ms_server):
                     obs.append([self.nfs[t][i*GP.n_ms_server+j].lamda, self.nfs[t][i*GP.n_ms_server+j].n_threads])
         log.logger.debug('obs[%d]=\n%s' % (ts, str(obs)))
-        return OBSRWD(ts, obs)
+        return OBSRWD(ts, obs, RV.time_step_reward[-1])
 
     def act(self, action):
         log.logger.debug('before %d reqs, add %d reqs' % (len(self.left_reqs), len(action.value)))
@@ -83,12 +83,13 @@ class ENV:
 
         major_reward = (1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))) * major_reward
         log.logger.debug('major reward = %f' % (major_reward))
+        RV.time_step_reward.append(major_reward)
 
         deleted_reqs = self.left_reqs[0:index]
         del self.left_reqs[0:index]
         for req in deleted_reqs:
             for act in req:
                 [m, s, i, n] = act
-                log.logger.debug('minus [%d,%d,%d].n_threads = %d' % (m,s,i,n))
+                #log.logger.debug('minus [%d,%d,%d].n_threads = %d' % (m,s,i,n))
                 self.nfs[m][s * GP.n_ms_server + i].n_threads -= n
 

@@ -1,10 +1,10 @@
 import utils.global_parameters as GP
 
 class OBSRWD:
-    def __init__(self, ts, value):
+    def __init__(self, ts, value, reward):
         self.id = ts
         self.value = value
-        self.major_reward = 0
+        self.major_reward = reward
         self.obs_delay = GP.obs_delay
 
 class ACT:
