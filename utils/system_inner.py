@@ -1,5 +1,7 @@
 from utils.obs_reward_action_def import OBSRWD
 import results.running_value as RV
+import utils.global_parameters as GP
+from utils.logger import log
 
 def CHECK_OBSERVATIONS(ts):
     O = []
@@ -8,3 +10,26 @@ def CHECK_OBSERVATIONS(ts):
             O.append(ob)
             RV.obs_on_road.remove(ob)
     return O
+
+def CHECK_VALID_ACTION(obs_env, index, n_threads):
+
+    for n in range(GP.n_servers):
+        sum = 0
+        for m in range(len(GP.c_r_ms)):
+            for i in range(GP.n_ms_server):
+                idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_servers + i
+                if index == idx:
+                    if obs_env[idx][1] + n_threads > GP.ypi_max:
+                        log.logger.debug('exceed maximum threads')
+                        return False
+                    if obs_env[idx][1] + n_threads > 0:
+                        sum += (GP.c_r_ms[m] + GP.psi_ms[m]*(obs_env[idx][1]+n_threads))
+                else:
+                    if obs_env[idx][1] > 0:
+                        sum += (GP.c_r_ms[m] + GP.psi_ms[m]*obs_env[idx][1])
+        log.logger.debug('server[%d] total CPU = %d' % (n, sum))
+        if sum > GP.n_cpu_core*GP.cpu:
+            log.logger.debug('exceed maximum cpu')
+            return False
+
+    return True
