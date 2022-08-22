@@ -11,6 +11,7 @@ if __name__ == '__main__':
     env, agent = ENV(), None
     if GP.agent_type is 'nddqn':
         agent = NDDQN()
+        GP.obs_delay = 0
     for ep in range(GP.n_episode):
         env.reset()
         agent.reset()
@@ -18,6 +19,7 @@ if __name__ == '__main__':
         for ts in range(GP.n_time_steps):
             log.logger.debug('[line-9][Training Episode - %d][Time Step - %d]' % (ep, ts))
             obs_rwd = env.send_obs_reward(ts)
+            RV.obs_on_road.append(obs_rwd)
             action = agent.receive_observation_s(SI.CHECK_OBSERVATIONS(ts), ts)
             env.act(action)
         log.logger.debug('Episode-%d reward: %f' % (ep, RV.episode_reward[-1]))

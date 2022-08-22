@@ -1,6 +1,9 @@
+import numpy.random
+
 n_episode = 1
 n_time_steps = 2
 agent_type = 'nddqn' # no-delay-dqn
+obs_delay = 0
 
 n_servers = 10
 n_ms_server = 10
@@ -21,3 +24,5 @@ msc = [
     [4,2,3,0],
     [2,3,4,5]
 ]
+
+arrive_rate = numpy.random.normal(4, 0, 10)

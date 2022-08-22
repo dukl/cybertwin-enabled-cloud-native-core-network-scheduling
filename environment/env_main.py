@@ -3,11 +3,13 @@ from utils.obs_reward_action_def import OBSRWD
 from utils.logger import log
 
 
+
 class NF:
     def __init__(self, type, id):
         self.id = [type, id]
         self.n_threads = 0
         self.lamda = 0
+
 
 class ENV:
     def __init__(self):
