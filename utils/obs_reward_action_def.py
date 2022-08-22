@@ -8,6 +8,6 @@ class OBSRWD:
         self.obs_delay = GP.obs_delay
 
 class ACT:
-    def __init__(self, ts):
+    def __init__(self, ts, value):
         self.id = ts
-        self.value = 0
+        self.value = value

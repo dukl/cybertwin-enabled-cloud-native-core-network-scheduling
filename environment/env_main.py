@@ -31,4 +31,8 @@ class ENV:
         return OBSRWD(ts, obs)
 
     def act(self, action):
-        pass
+        for act in action.value:
+            [m, s, i, n] = act
+            #log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
+            self.nfs[m][s * GP.n_servers + i].lamda += 1
+            self.nfs[m][s * GP.n_servers + i].n_threads += n

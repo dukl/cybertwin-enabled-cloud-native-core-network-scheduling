@@ -1,6 +1,7 @@
 import random
 import numpy
 from utils.logger import log
+from utils.obs_reward_action_def import ACT
 
 import utils.global_parameters as GP
 
@@ -18,6 +19,7 @@ class NDDQN:
         return reqs
 
     def receive_observation_s(self, obs, ts):
+        inter_actions = []
         reqs = self.receive_requests()
         obs_env = obs[0].value
         for i in range(len(GP.msc)):
@@ -33,7 +35,10 @@ class NDDQN:
                     if n_threads <= GP.ypi_max - obs_env[idx][1]:
                         obs_env[idx][0] += 1
                         obs_env[idx][1] += n_threads
+                        inter_actions.append([ms, server_idx, inst_idx, n_threads])
                     #else:
                         #log.logger.debug('punish action = %d' % (action))
+        log.logger.debug('agent-obs[%d]=\n%s' % (ts+1, str(obs_env)))
+        return ACT(ts, inter_actions)
 
 
