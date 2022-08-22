@@ -17,6 +17,7 @@ if __name__ == '__main__':
         agent.reset()
         RV.episode_reward.append(0)
         for ts in range(GP.n_time_steps):
+            RV.mapped_succ_rate.append(0)
             log.logger.debug('[line-9][Training Episode - %d][Time Step - %d]' % (ep, ts))
             obs_rwd = env.send_obs_reward(ts)
             RV.obs_on_road.append(obs_rwd)

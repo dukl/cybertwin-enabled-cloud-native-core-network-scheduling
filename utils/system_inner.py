@@ -17,10 +17,13 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
         sum = 0
         for m in range(len(GP.c_r_ms)):
             for i in range(GP.n_ms_server):
-                idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_servers + i
+                idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_ms_server + i
                 if index == idx:
                     if obs_env[idx][1] + n_threads > GP.ypi_max:
                         log.logger.debug('exceed maximum threads')
+                        return False
+                    if obs_env[idx][1] + n_threads == 0:
+                        log.logger.debug('final threads = 0')
                         return False
                     if obs_env[idx][1] + n_threads > 0:
                         sum += (GP.c_r_ms[m] + GP.psi_ms[m]*(obs_env[idx][1]+n_threads))

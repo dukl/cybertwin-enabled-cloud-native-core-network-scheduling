@@ -17,7 +17,7 @@ class ENV:
         for t in range(len(GP.c_r_ms)):
             for i in range(GP.n_servers):
                 for j in range(GP.n_ms_server):
-                    self.nfs[t].append(NF(t, i*GP.n_servers+j))
+                    self.nfs[t].append(NF(t, i*GP.n_ms_server+j))
 
     def reset(self):
         pass
@@ -26,13 +26,23 @@ class ENV:
         for t in range(len(GP.c_r_ms)):
             for i in range(GP.n_servers):
                 for j in range(GP.n_ms_server):
-                    obs.append([self.nfs[t][i*GP.n_servers+j].lamda, self.nfs[t][i*GP.n_servers+j].n_threads])
+                    obs.append([self.nfs[t][i*GP.n_ms_server+j].lamda, self.nfs[t][i*GP.n_ms_server+j].n_threads])
         log.logger.debug('obs[%d]=\n%s' % (ts, str(obs)))
         return OBSRWD(ts, obs)
 
     def act(self, action):
-        for act in action.value:
-            [m, s, i, n] = act
-            #log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
-            self.nfs[m][s * GP.n_servers + i].lamda += 1
-            self.nfs[m][s * GP.n_servers + i].n_threads += n
+        for req in action.value:
+            for act in req:
+                [m, s, i, n] = act
+                #log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
+                self.nfs[m][s * GP.n_ms_server + i].lamda += 1
+                self.nfs[m][s * GP.n_ms_server + i].n_threads += n
+        total_time = 0
+        for req in action.value:
+            sum = 0
+            for act in req:
+                [m, s, i, n] = act
+                sum += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_m / self.nfs[m][s * GP.n_ms_server + i].n_threads + 1/(GP.cpu/GP.psi_ms[m] - 1)
+            total_time += sum
+            log.logger.debug('response time = %f' % (sum))
+        log.logger.debug('total response time = %f' % (total_time))

@@ -1,12 +1,12 @@
 import numpy.random
 
 n_episode = 1
-n_time_steps = 4
+n_time_steps = 5
 agent_type = 'nddqn' # no-delay-dqn
 obs_delay = 0
 
 n_servers = 4
-n_ms_server = 4
+n_ms_server = 5
 ypi_max = 8
 
 c_r_ms = [25, 36, 34, 24, 25, 15]
@@ -27,3 +27,5 @@ msc = [
 ]
 
 arrive_rate = numpy.random.normal(40, 10, 10)
+
+w_m = 10
