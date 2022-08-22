@@ -32,4 +32,4 @@ arrive_rate = numpy.random.normal(40, 10, 10)
 
 one_step_time = 150
 
-beta_r = 0.8
+beta_r = 15

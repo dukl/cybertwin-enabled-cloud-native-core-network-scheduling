@@ -38,7 +38,7 @@ class ENV:
         for req in action.value:
             for act in req:
                 [m, s, i, n] = act
-                #log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
+                log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
                 self.nfs[m][s * GP.n_ms_server + i].lamda += 1
                 self.nfs[m][s * GP.n_ms_server + i].n_threads += n
         total_time = 0
@@ -50,7 +50,10 @@ class ENV:
             sum_min = 0
             for act in self.left_reqs[r]:
                 [m, s, i, n] = act
+                if self.nfs[m][s * GP.n_ms_server + i].n_threads == 0:
+                    self.nfs[m][s * GP.n_ms_server + i].n_threads = 1
                 log.logger.debug('[%d,%d,%d].lamda = %d' % (m,s,i, self.nfs[m][s * GP.n_ms_server + i].lamda))
+                log.logger.debug('[%d,%d,%d].n_threads = %d' % (m, s, i, self.nfs[m][s * GP.n_ms_server + i].n_threads))
                 sum += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / self.nfs[m][s * GP.n_ms_server + i].n_threads + 1/(GP.cpu/GP.psi_ms[m] - 1)
                 sum_max += GP.lamda_ms[m]*GP.w_ms[m] / 1 + 1/(GP.cpu/GP.psi_ms[m] - 1)
                 sum_min += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / GP.ypi_max + 1/(GP.cpu/GP.psi_ms[m] - 1)
@@ -67,7 +70,25 @@ class ENV:
         log.logger.debug('processed %d reqs from %d reqs' % (index, len(self.left_reqs)))
         Q_t = Q_t/(len(self.left_reqs))
         log.logger.debug('Q_t = %f' % (Q_t))
-        del self.left_reqs[0:index]
         major_reward = action.n_mapped_succ_rate * Q_t*action.total_reqs*GP.beta_r
+        log.logger.debug('major reward-1 = %f' % (major_reward))
+
+        sum_threads = 0
+        for m in range(len(GP.c_r_ms)):
+            for n in range(GP.n_servers):
+                for i in range(GP.n_ms_server):
+                    sum_threads += self.nfs[m][n*GP.n_ms_server+i].n_threads
+
+        log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
+
+        major_reward = (1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))) * major_reward
         log.logger.debug('major reward = %f' % (major_reward))
+
+        deleted_reqs = self.left_reqs[0:index]
+        del self.left_reqs[0:index]
+        for req in deleted_reqs:
+            for act in req:
+                [m, s, i, n] = act
+                log.logger.debug('minus [%d,%d,%d].n_threads = %d' % (m,s,i,n))
+                self.nfs[m][s * GP.n_ms_server + i].n_threads -= n
 
