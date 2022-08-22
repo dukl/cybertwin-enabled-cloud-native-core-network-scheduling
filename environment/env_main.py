@@ -18,6 +18,7 @@ class ENV:
             for i in range(GP.n_servers):
                 for j in range(GP.n_ms_server):
                     self.nfs[t].append(NF(t, i*GP.n_ms_server+j))
+        self.left_reqs = []
 
     def reset(self):
         pass
@@ -31,6 +32,9 @@ class ENV:
         return OBSRWD(ts, obs)
 
     def act(self, action):
+        log.logger.debug('before %d reqs, add %d reqs' % (len(self.left_reqs), len(action.value)))
+        self.left_reqs += action.value
+        log.logger.debug('env running to process %d reqs' % (len(self.left_reqs)))
         for req in action.value:
             for act in req:
                 [m, s, i, n] = act
@@ -38,11 +42,32 @@ class ENV:
                 self.nfs[m][s * GP.n_ms_server + i].lamda += 1
                 self.nfs[m][s * GP.n_ms_server + i].n_threads += n
         total_time = 0
-        for req in action.value:
+        index = 0
+        Q_t = 0
+        for r in range(len(self.left_reqs)):
             sum = 0
-            for act in req:
+            sum_max = 0
+            sum_min = 0
+            for act in self.left_reqs[r]:
                 [m, s, i, n] = act
-                sum += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_m / self.nfs[m][s * GP.n_ms_server + i].n_threads + 1/(GP.cpu/GP.psi_ms[m] - 1)
+                log.logger.debug('[%d,%d,%d].lamda = %d' % (m,s,i, self.nfs[m][s * GP.n_ms_server + i].lamda))
+                sum += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / self.nfs[m][s * GP.n_ms_server + i].n_threads + 1/(GP.cpu/GP.psi_ms[m] - 1)
+                sum_max += GP.lamda_ms[m]*GP.w_ms[m] / 1 + 1/(GP.cpu/GP.psi_ms[m] - 1)
+                sum_min += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / GP.ypi_max + 1/(GP.cpu/GP.psi_ms[m] - 1)
+                self.nfs[m][s * GP.n_ms_server + i].lamda -= 1
+            log.logger.debug('response time = %f, max = %f, min = %f, q_t = %f' % (sum, sum_max, sum_min, (sum_max - sum)/(sum_max - sum_min)))
+            Q_t += (sum_max - sum)/(sum_max - sum_min)
             total_time += sum
-            log.logger.debug('response time = %f' % (sum))
-        log.logger.debug('total response time = %f' % (total_time))
+            log.logger.debug('total response time = %f' % (total_time))
+            if total_time > GP.one_step_time:
+                index = r + 1
+                break
+        if total_time <= GP.one_step_time:
+            index = r + 1
+        log.logger.debug('processed %d reqs from %d reqs' % (index, len(self.left_reqs)))
+        Q_t = Q_t/(len(self.left_reqs))
+        log.logger.debug('Q_t = %f' % (Q_t))
+        del self.left_reqs[0:index]
+        major_reward = action.n_mapped_succ_rate * Q_t*action.total_reqs*GP.beta_r
+        log.logger.debug('major reward = %f' % (major_reward))
+

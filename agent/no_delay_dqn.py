@@ -63,6 +63,6 @@ class NDDQN:
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1]/sum(reqs)
         log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
         #log.logger.debug('agent-obs[%d]=\n%s' % (ts+1, str(obs_env)))
-        return ACT(ts, valid_action, RV.mapped_succ_rate[-1])
+        return ACT(ts, valid_action, RV.mapped_succ_rate[-1], sum(reqs))
 
 
