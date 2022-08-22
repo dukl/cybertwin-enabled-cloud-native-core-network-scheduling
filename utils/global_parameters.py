@@ -5,8 +5,9 @@ n_time_steps = 2
 agent_type = 'nddqn' # no-delay-dqn
 obs_delay = 0
 
-n_servers = 10
-n_ms_server = 10
+n_servers = 4
+n_ms_server = 4
+ypi_max = 8
 
 c_r_ms = [25, 36, 34, 24, 25, 15]
 psi_ms = [92, 52, 99, 68, 78, 112]
@@ -25,4 +26,4 @@ msc = [
     [2,3,4,5]
 ]
 
-arrive_rate = numpy.random.normal(4, 0, 10)
+arrive_rate = numpy.random.normal(40, 10, 10)
