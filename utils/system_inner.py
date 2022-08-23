@@ -40,3 +40,6 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
             return False
 
     return True
+
+def CHECK_ACT_OBS_DIM():
+    return GP.n_servers*GP.n_ms_server*2 + 3, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)

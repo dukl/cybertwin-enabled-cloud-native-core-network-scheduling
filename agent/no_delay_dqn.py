@@ -6,10 +6,12 @@ import utils.system_inner as SI
 import utils.global_parameters as GP
 import environment.compute_reward as CR
 import results.running_value as RV
+from agent.aiModels.dqn import DQN
 
 class NDDQN:
     def __init__(self):
-        self.pending_reward = None
+        self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
+        self.model = DQN(self.act_dim, self.obs_dim)
 
     def reset(self):
         pass
@@ -31,8 +33,10 @@ class NDDQN:
                 log.logger.debug('minor-reward=%f' % (mem[2]))
                 mem[2] += obs[0].major_reward
                 log.logger.debug('major-reward=%f, total-reward=%f' % (obs[0].major_reward, mem[2]))
-                RV.modified_memory.append(mem)
+                #RV.modified_memory.append(mem)
+                self.model.store_transition(mem[0], mem[1], mem[2], mem[3])
             RV.memory.clear()
+        self.model.learn()
         tmp_memory = []
         for i in range(len(GP.msc)):
             for j in range(reqs[i]):
@@ -45,7 +49,8 @@ class NDDQN:
                     obs_req = [i, reqs[i], ms]
                     obs_input = numpy.array([b for a in obs_env for b in a] + obs_req)
                     #log.logger.debug('obs_input=\n%s' % (str(obs_input)))
-                    action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
+                    #action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
+                    action = self.model.choose_action(obs_input)
                     server_idx, inst_idx, n_threads = int(action/(GP.n_ms_server*(GP.ypi_max+1))), int((action%(GP.n_ms_server*(GP.ypi_max+1)))/(GP.ypi_max+1)), (action%(GP.n_ms_server*(GP.ypi_max+1)))%(GP.ypi_max+1)
                     log.logger.debug('action=%d -> server_idx=%d, inst_idx=%d, n_threads=%d' % (action, server_idx, inst_idx, n_threads))
                     idx = ms*GP.n_servers*GP.n_ms_server + server_idx*GP.n_ms_server + inst_idx
