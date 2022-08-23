@@ -9,7 +9,8 @@ import results.running_value as RV
 
 class NDDQN:
     def __init__(self):
-        pass
+        self.pending_reward = None
+
     def reset(self):
         pass
 
@@ -25,6 +26,14 @@ class NDDQN:
         reqs = self.receive_requests()
         obs_env = obs[0].value
         log.logger.debug('major reward = %f' % obs[0].major_reward)
+        if ts > 0:
+            for mem in RV.memory[-1]:
+                log.logger.debug('minor-reward=%f' % (mem[2]))
+                mem[2] += obs[0].major_reward
+                log.logger.debug('major-reward=%f, total-reward=%f' % (obs[0].major_reward, mem[2]))
+                RV.modified_memory.append(mem)
+            RV.memory.clear()
+        tmp_memory = []
         for i in range(len(GP.msc)):
             for j in range(reqs[i]):
                 is_req_mapped_success = True
@@ -49,8 +58,12 @@ class NDDQN:
                         log.logger.debug('punish action = %d' % (action))
                     obs_env[idx][0] += 1
                     obs_env[idx][1] += n_threads
-                    reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
-                    log.logger.debug('minor reward = %f' % (reward))
+                    obs_next = numpy.array([b for a in obs_env for b in a] + obs_req)
+                    minor_reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
+                    log.logger.debug('minor reward = %f' % (minor_reward))
+
+                    tmp_memory.append([obs_input, action, minor_reward, obs_next])
+
                     if is_mapped_success is False:
                         obs_env = copy.deepcopy(last_obs_env)
                 if is_req_mapped_success is False:
@@ -60,6 +73,7 @@ class NDDQN:
                 else:
                     log.logger.debug('req is mapped successfully')
                     valid_action.append(inter_actions)
+        RV.memory.append(tmp_memory)
         n_successful_mapped_reqs = sum(reqs) - RV.mapped_succ_rate[-1]
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1]/sum(reqs)
         log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
