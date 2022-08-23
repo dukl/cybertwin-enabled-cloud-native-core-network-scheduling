@@ -42,4 +42,12 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
     return True
 
 def CHECK_ACT_OBS_DIM():
-    return GP.n_servers*GP.n_ms_server*2 + 3, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)
+    return GP.n_servers*GP.n_ms_server*len(GP.c_r_ms)*2 + 3, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)
+
+def RESET(env, agent):
+    env.reset()
+    agent.reset()
+    RV.obs_on_road.clear()
+    RV.time_step_reward = [-1]
+    RV.mapped_succ_rate.clear()
+    RV.memory.clear()

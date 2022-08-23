@@ -21,7 +21,13 @@ class ENV:
         self.left_reqs = []
 
     def reset(self):
-        pass
+        self.left_reqs.clear()
+        for t in range(len(GP.c_r_ms)):
+            for i in range(GP.n_servers):
+                for j in range(GP.n_ms_server):
+                    self.nfs[t][i * GP.n_ms_server + j].lamda = 0
+                    self.nfs[t][i * GP.n_ms_server + j].n_threads = 0
+
     def send_obs_reward(self, ts):
         obs = []
         for t in range(len(GP.c_r_ms)):
@@ -82,8 +88,9 @@ class ENV:
         log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
 
         major_reward = (1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))) * major_reward
-        log.logger.debug('major reward = %f' % (major_reward))
+        log.logger.debug('time step major reward = %f' % (major_reward))
         RV.time_step_reward.append(major_reward)
+        RV.episode_reward[-1] += major_reward
 
         deleted_reqs = self.left_reqs[0:index]
         del self.left_reqs[0:index]

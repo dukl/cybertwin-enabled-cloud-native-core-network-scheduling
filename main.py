@@ -13,8 +13,7 @@ if __name__ == '__main__':
         agent = NDDQN()
         GP.obs_delay = 0
     for ep in range(GP.n_episode):
-        env.reset()
-        agent.reset()
+        SI.RESET(env, agent)
         RV.episode_reward.append(0)
         for ts in range(GP.n_time_steps):
             RV.mapped_succ_rate.append(0)
