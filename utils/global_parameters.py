@@ -1,7 +1,7 @@
 import numpy.random
 
 n_episode = 1
-n_time_steps = 5
+n_time_steps = 3
 agent_type = 'nddqn' # no-delay-dqn
 obs_delay = 0
 
@@ -32,4 +32,4 @@ arrive_rate = numpy.random.normal(40, 10, 10)
 
 one_step_time = 150
 
-beta_r = 15
+beta_r = 10

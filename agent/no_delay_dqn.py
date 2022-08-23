@@ -49,8 +49,8 @@ class NDDQN:
                         log.logger.debug('punish action = %d' % (action))
                     obs_env[idx][0] += 1
                     obs_env[idx][1] += n_threads
-                    reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i)
-                    log.logger.debug('reward = %f' % (reward))
+                    reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
+                    log.logger.debug('minor reward = %f' % (reward))
                     if is_mapped_success is False:
                         obs_env = copy.deepcopy(last_obs_env)
                 if is_req_mapped_success is False:
