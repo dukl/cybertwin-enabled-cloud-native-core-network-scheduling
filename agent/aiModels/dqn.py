@@ -6,6 +6,7 @@ from keras.models import Model
 import keras
 from keras.optimizers import RMSprop ,adam
 from keras import backend as K
+from utils.logger import log
 
 np.random.seed(1)
 
@@ -86,8 +87,10 @@ class DQN:
         self.learn_step_counter += 1
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.target_replace_op()
-        if (self.learn_step_counter < 100) or (self.learn_step_counter % 100 != 0):
+            log.logger.debug('Replacing Target network ...')
+        if (self.learn_step_counter < 3) or (self.learn_step_counter % 3 != 0):
             return
+        log.logger.debug('Training ...')
         if self.memory_counter > self.memory_size:
             sample_index = np.random.choice(self.memory_size, size=self.batch_size)
         else:

@@ -19,24 +19,24 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
             for i in range(GP.n_ms_server):
                 idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_ms_server + i
                 if index == idx:
-                    log.logger.debug('changing [m,s,i,n] = [%d,%d,%d,%d]' % (m, n, i, n_threads))
+                    #log.logger.debug('changing [m,s,i,n] = [%d,%d,%d,%d]' % (m, n, i, n_threads))
                     if obs_env[idx][1] + n_threads > GP.ypi_max:
-                        log.logger.debug('exceed maximum threads')
+                        #log.logger.debug('exceed maximum threads')
                         return False
                     if obs_env[idx][1] + n_threads == 0:
-                        log.logger.debug('final threads = 0')
+                        #log.logger.debug('final threads = 0')
                         return False
                     if obs_env[idx][0] + 1 > GP.lamda_ms[m]:
-                        log.logger.debug('lamda exceed maximum lamda of microservice (%d=%d)' % (m, GP.lamda_ms[m]))
+                        #log.logger.debug('lamda exceed maximum lamda of microservice (%d=%d)' % (m, GP.lamda_ms[m]))
                         return False
                     if obs_env[idx][1] + n_threads > 0:
                         sum += (GP.c_r_ms[m] + GP.psi_ms[m]*(obs_env[idx][1]+n_threads))
                 else:
                     if obs_env[idx][1] > 0:
                         sum += (GP.c_r_ms[m] + GP.psi_ms[m]*obs_env[idx][1])
-        log.logger.debug('server[%d] total CPU = %d' % (n, sum))
+        #log.logger.debug('server[%d] total CPU = %d' % (n, sum))
         if sum > GP.n_cpu_core*GP.cpu:
-            log.logger.debug('exceed maximum cpu')
+            #log.logger.debug('exceed maximum cpu')
             return False
 
     return True

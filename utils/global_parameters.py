@@ -1,7 +1,7 @@
 import numpy.random
 
-n_episode = 1
-n_time_steps = 3
+n_episode = 10
+n_time_steps = 10
 agent_type = 'nddqn' # no-delay-dqn
 obs_delay = 0
 
