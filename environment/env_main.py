@@ -67,16 +67,21 @@ class ENV:
             #log.logger.debug('response time = %f, max = %f, min = %f, q_t = %f' % (sum, sum_max, sum_min, (sum_max - sum)/(sum_max - sum_min)))
             Q_t += (sum_max - sum)/(sum_max - sum_min)
             total_time += sum
-            #log.logger.debug('total response time = %f' % (total_time))
+            log.logger.debug('total response time = %f' % (total_time))
             if total_time > GP.one_step_time:
                 index = r + 1
                 break
         if total_time <= GP.one_step_time:
-            index = r + 1
-        #log.logger.debug('processed %d reqs from %d reqs' % (index, len(self.left_reqs)))
-        Q_t = Q_t/(len(self.left_reqs))
+            index = len(self.left_reqs)
+        log.logger.debug('processed %d reqs from %d reqs' % (index, len(self.left_reqs)))
+
+        if len(self.left_reqs) == 0:
+            Q_t = 0
+        else:
+            Q_t = Q_t/(len(self.left_reqs))
         #log.logger.debug('Q_t = %f' % (Q_t))
         major_reward = action.n_mapped_succ_rate * Q_t*action.total_reqs*GP.beta_r
+        #major_reward = action.n_mapped_succ_rate * Q_t * GP.beta_r
         #log.logger.debug('major reward-1 = %f' % (major_reward))
 
         sum_threads = 0
@@ -86,8 +91,9 @@ class ENV:
                     sum_threads += self.nfs[m][n*GP.n_ms_server+i].n_threads
 
         #log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
-
-        major_reward = (1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))) * major_reward
+        resource_rate = 1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))
+        major_reward *= resource_rate
+        log.logger.debug('detailed-reward: succ_rate=%f, Q_t=%f, total_req=%d, resource_rate=%f' % (action.n_mapped_succ_rate, Q_t, action.total_reqs, resource_rate))
         log.logger.debug('time step major reward = %f' % (major_reward))
         RV.time_step_reward.append(major_reward)
         RV.episode_reward[-1] += major_reward

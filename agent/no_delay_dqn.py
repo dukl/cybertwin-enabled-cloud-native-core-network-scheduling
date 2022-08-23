@@ -48,6 +48,7 @@ class NDDQN:
                     last_obs_env = copy.deepcopy(obs_env)
                     obs_req = [i, reqs[i], ms]
                     obs_input = numpy.array([b for a in obs_env for b in a] + obs_req)
+                    obs_input[obs_input==0] = 0.0001
                     ##log.logger.debug('obs_input=\n%s' % (str(obs_input)))
                     #action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
                     action = self.model.choose_action(obs_input)
@@ -64,6 +65,7 @@ class NDDQN:
                     obs_env[idx][0] += 1
                     obs_env[idx][1] += n_threads
                     obs_next = numpy.array([b for a in obs_env for b in a] + obs_req)
+                    obs_next[obs_next==0] = 0.0001
                     minor_reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
                     #log.logger.debug('minor reward = %f' % (minor_reward))
 
@@ -83,6 +85,6 @@ class NDDQN:
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1]/sum(reqs)
         #log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
         ##log.logger.debug('agent-obs[%d]=\n%s' % (ts+1, str(obs_env)))
-        return ACT(ts, valid_action, RV.mapped_succ_rate[-1], sum(reqs))
+        return ACT(ts, valid_action, RV.mapped_succ_rate[-1], n_successful_mapped_reqs)
 
 

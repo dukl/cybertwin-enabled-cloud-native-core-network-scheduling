@@ -21,13 +21,13 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
                 if index == idx:
                     #log.logger.debug('changing [m,s,i,n] = [%d,%d,%d,%d]' % (m, n, i, n_threads))
                     if obs_env[idx][1] + n_threads > GP.ypi_max:
-                        #log.logger.debug('exceed maximum threads')
+                        #log.logger.debug('exceed maximum threads: [%d,%d,%d,%d]' % (m, n, i, n_threads))
                         return False
                     if obs_env[idx][1] + n_threads == 0:
-                        #log.logger.debug('final threads = 0')
+                        #log.logger.debug('final threads = 0: [%d,%d,%d,%d]' % (m, n, i, n_threads))
                         return False
                     if obs_env[idx][0] + 1 > GP.lamda_ms[m]:
-                        #log.logger.debug('lamda exceed maximum lamda of microservice (%d=%d)' % (m, GP.lamda_ms[m]))
+                        #log.logger.debug('lamda exceed maximum lamda of microservice (%d=%d): [%d,%d,%d,%d]' % (m, GP.lamda_ms[m], m, n, i, n_threads))
                         return False
                     if obs_env[idx][1] + n_threads > 0:
                         sum += (GP.c_r_ms[m] + GP.psi_ms[m]*(obs_env[idx][1]+n_threads))

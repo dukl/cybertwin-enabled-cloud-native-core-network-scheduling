@@ -16,12 +16,12 @@ class DQN:
             self,
             n_actions,
             n_features,
-            learning_rate=0.01,
-            reward_decay=0.9,
-            e_greedy=0.9,
+            learning_rate=0.001,
+            reward_decay=0.99,
+            e_greedy=0.95,
             replace_target_iter=300,
-            memory_size=5000,
-            batch_size=128,
+            memory_size=5000000,
+            batch_size=15000,
             e_greedy_increment=None,
             output_graph=False,
     ):
@@ -49,13 +49,15 @@ class DQN:
     def _build_net(self):
         # 构建evaluation网络
         eval_inputs = Input(shape=(self.n_features,))
-        x = Dense(64, activation='relu')(eval_inputs)
-        x = Dense(64, activation='relu')(x)
+        x = Dense(128, activation='relu')(eval_inputs)
+        x = Dense(128, activation='relu')(x)
+        x = Dense(128, activation='relu')(x)
         self.q_eval = Dense(self.n_actions)(x)
         # 构建target网络，注意这个target层输出是q_next而不是，算法中的q_target
         target_inputs = Input(shape=(self.n_features,))
-        x = Dense(64, activation='relu')(target_inputs)
-        x = Dense(64, activation='relu')(x)
+        x = Dense(128, activation='relu')(target_inputs)
+        x = Dense(128, activation='relu')(x)
+        x = Dense(128, activation='relu')(x)
         self.q_next = Dense(self.n_actions)(x)
 
         self.model1 = Model(target_inputs, self.q_next)
@@ -88,7 +90,7 @@ class DQN:
         if self.learn_step_counter % self.replace_target_iter == 0:
             self.target_replace_op()
             log.logger.debug('Replacing Target network ...')
-        if (self.learn_step_counter < 3) or (self.learn_step_counter % 3 != 0):
+        if (self.learn_step_counter < 150) or (self.learn_step_counter % 150 != 0):
             return
         log.logger.debug('Training ...')
         if self.memory_counter > self.memory_size:
