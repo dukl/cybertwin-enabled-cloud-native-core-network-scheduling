@@ -47,6 +47,8 @@ class ENV:
                 #log.logger.debug('[m,s,i,n]=[%d,%d,%d,%d]' % (m,s,i,n))
                 self.nfs[m][s * GP.n_ms_server + i].lamda += 1
                 self.nfs[m][s * GP.n_ms_server + i].n_threads += n
+                if self.nfs[m][s * GP.n_ms_server + i].n_threads > GP.ypi_max:
+                    self.nfs[m][s * GP.n_ms_server + i].n_threads = GP.ypi_max
         total_time = 0
         index = 0
         Q_t = 0
@@ -67,7 +69,7 @@ class ENV:
             #log.logger.debug('response time = %f, max = %f, min = %f, q_t = %f' % (sum, sum_max, sum_min, (sum_max - sum)/(sum_max - sum_min)))
             Q_t += (sum_max - sum)/(sum_max - sum_min)
             total_time += sum
-            log.logger.debug('total response time = %f' % (total_time))
+            #log.logger.debug('total response time = %f' % (total_time))
             if total_time > GP.one_step_time:
                 index = r + 1
                 break
@@ -90,7 +92,7 @@ class ENV:
                 for i in range(GP.n_ms_server):
                     sum_threads += self.nfs[m][n*GP.n_ms_server+i].n_threads
 
-        #log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
+        log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
         resource_rate = 1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))
         major_reward *= resource_rate
         log.logger.debug('detailed-reward: succ_rate=%f, Q_t=%f, total_req=%d, resource_rate=%f' % (action.n_mapped_succ_rate, Q_t, action.total_reqs, resource_rate))
@@ -105,4 +107,6 @@ class ENV:
                 [m, s, i, n] = act
                 ##log.logger.debug('minus [%d,%d,%d].n_threads = %d' % (m,s,i,n))
                 self.nfs[m][s * GP.n_ms_server + i].n_threads -= n
+                if self.nfs[m][s * GP.n_ms_server + i].n_threads < 0:
+                    self.nfs[m][s * GP.n_ms_server + i].n_threads = 1
 

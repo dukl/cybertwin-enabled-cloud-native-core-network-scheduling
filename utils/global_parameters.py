@@ -30,6 +30,6 @@ msc = [
 
 arrive_rate = numpy.random.normal(5, 1, 10)
 
-one_step_time = 150
+one_step_time = 1500
 
 beta_r = 10

@@ -7,14 +7,17 @@ import utils.global_parameters as GP
 import environment.compute_reward as CR
 import results.running_value as RV
 from agent.aiModels.dqn import DQN
+from agent.aiModels.dqn_agents import DDQNAgent
 
 class NDDQN:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
-        self.model = DQN(self.act_dim, self.obs_dim)
+        #self.model = DQN(self.act_dim, self.obs_dim)
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.001, 1, False, True)
+        self.step_num = 0
 
     def reset(self):
-        pass
+        self.step_num = 0
 
     def receive_requests(self):
         reqs = [0 for _ in range(len(GP.arrive_rate))]
@@ -34,9 +37,18 @@ class NDDQN:
                 mem[2] += obs[0].major_reward
                 #log.logger.debug('major-reward=%f, total-reward=%f' % (obs[0].major_reward, mem[2]))
                 #RV.modified_memory.append(mem)
-                self.model.store_transition(mem[0], mem[1], mem[2], mem[3])
+                #self.model.store_transition(mem[0], mem[1], mem[2], mem[3])
+                self.model.memorize(mem[0], mem[1], mem[2], mem[3], False)
             RV.memory.clear()
-        self.model.learn()
+        #self.model.learn()
+        self.step_num += 1
+        if self.step_num % 200 == 0:
+            log.logger.debug('Replacing...')
+            self.model.update_target_model()
+        batch_size = 32
+        if len(self.model.memory) > batch_size and self.step_num % 10 == 0:
+            log.logger.debug('Training...')
+            batch_loss_dict = self.model.replay(batch_size)
         tmp_memory = []
         for i in range(len(GP.msc)):
             for j in range(reqs[i]):
@@ -47,11 +59,13 @@ class NDDQN:
                     is_mapped_success = True
                     last_obs_env = copy.deepcopy(obs_env)
                     obs_req = [i, reqs[i], ms]
-                    obs_input = numpy.array([b for a in obs_env for b in a] + obs_req)
-                    obs_input[obs_input==0] = 0.0001
+                    norm_obs_env = SI.NORM_STATE(copy.deepcopy(obs_env))
+                    obs_input = numpy.array([b for a in norm_obs_env for b in a] + obs_req)
+                    #obs_input[obs_input==0] = 0.0001
                     ##log.logger.debug('obs_input=\n%s' % (str(obs_input)))
                     #action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
-                    action = self.model.choose_action(obs_input)
+                    #action = self.model.choose_action(obs_input)
+                    action = self.model.act(obs_input, eval=False)
                     server_idx, inst_idx, n_threads = int(action/(GP.n_ms_server*(GP.ypi_max+1))), int((action%(GP.n_ms_server*(GP.ypi_max+1)))/(GP.ypi_max+1)), (action%(GP.n_ms_server*(GP.ypi_max+1)))%(GP.ypi_max+1)
                     #log.logger.debug('action=%d -> server_idx=%d, inst_idx=%d, n_threads=%d' % (action, server_idx, inst_idx, n_threads))
                     idx = ms*GP.n_servers*GP.n_ms_server + server_idx*GP.n_ms_server + inst_idx
@@ -64,8 +78,11 @@ class NDDQN:
                         #log.logger.debug('punish action = %d' % (action))
                     obs_env[idx][0] += 1
                     obs_env[idx][1] += n_threads
-                    obs_next = numpy.array([b for a in obs_env for b in a] + obs_req)
-                    obs_next[obs_next==0] = 0.0001
+                    if obs_env[idx][1] > GP.ypi_max:
+                        obs_env[idx][1] = GP.ypi_max
+                    norm_obs_env_next = SI.NORM_STATE(copy.deepcopy(obs_env))
+                    obs_next = numpy.array([b for a in norm_obs_env_next for b in a] + obs_req)
+                    #obs_next[obs_next==0] = 0.0001
                     minor_reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
                     #log.logger.debug('minor reward = %f' % (minor_reward))
 
@@ -83,7 +100,7 @@ class NDDQN:
         RV.memory.append(tmp_memory)
         n_successful_mapped_reqs = sum(reqs) - RV.mapped_succ_rate[-1]
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1]/sum(reqs)
-        #log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
+        log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
         ##log.logger.debug('agent-obs[%d]=\n%s' % (ts+1, str(obs_env)))
         return ACT(ts, valid_action, RV.mapped_succ_rate[-1], n_successful_mapped_reqs)
 

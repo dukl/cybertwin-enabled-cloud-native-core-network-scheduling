@@ -22,7 +22,9 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
                     #log.logger.debug('changing [m,s,i,n] = [%d,%d,%d,%d]' % (m, n, i, n_threads))
                     if obs_env[idx][1] + n_threads > GP.ypi_max:
                         #log.logger.debug('exceed maximum threads: [%d,%d,%d,%d]' % (m, n, i, n_threads))
-                        return False
+                        #return False
+                        sum += (GP.c_r_ms[m] + GP.psi_ms[m]*(GP.ypi_max))
+                        continue
                     if obs_env[idx][1] + n_threads == 0:
                         #log.logger.debug('final threads = 0: [%d,%d,%d,%d]' % (m, n, i, n_threads))
                         return False
@@ -51,3 +53,13 @@ def RESET(env, agent):
     RV.time_step_reward = [-1]
     RV.mapped_succ_rate.clear()
     RV.memory.clear()
+
+def NORM_STATE(obs_env):
+    for m in range(len(GP.c_r_ms)):
+        for n in range(GP.n_servers):
+            for i in range(GP.n_ms_server):
+                idx = m*GP.n_servers*GP.n_ms_server + n*GP.n_ms_server + i
+                #log.logger.debug('lamda=%f, n_threads=%f' % (obs_env[idx][0], obs_env[idx][1]))
+                obs_env[idx][0] /= GP.lamda_ms[m]
+                obs_env[idx][1] /= GP.ypi_max
+    return obs_env
