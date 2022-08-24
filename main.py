@@ -3,6 +3,7 @@ from environment.env_main import ENV
 import utils.global_parameters as GP
 import utils.system_inner as SI
 from agent.no_delay_dqn import NDDQN
+from agent.delay_dqn_mlp import DDQNMLP
 import results.running_value as RV
 
 if __name__ == '__main__':
@@ -12,6 +13,9 @@ if __name__ == '__main__':
     if GP.agent_type is 'nddqn':
         agent = NDDQN()
         GP.obs_delay = 0
+    if GP.agent_type is 'ddqnMlp':
+        GP.obs_delay = 1
+        agent = DDQNMLP(GP.obs_delay)
     for ep in range(GP.n_episode):
         SI.RESET(env, agent)
         RV.episode_reward.append(0)

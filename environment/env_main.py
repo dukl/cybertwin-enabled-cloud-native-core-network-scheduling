@@ -38,7 +38,7 @@ class ENV:
         return OBSRWD(ts, obs, RV.time_step_reward[-1])
 
     def act(self, action):
-        #log.logger.debug('before %d reqs, add %d reqs' % (len(self.left_reqs), len(action.value)))
+        log.logger.debug('before %d reqs, add %d reqs' % (len(self.left_reqs), len(action.value)))
         self.left_reqs += action.value
         #log.logger.debug('env running to process %d reqs' % (len(self.left_reqs)))
         for req in action.value:
