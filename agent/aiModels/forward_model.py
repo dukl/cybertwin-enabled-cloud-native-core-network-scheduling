@@ -16,6 +16,7 @@ class FM:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
         self.model = self._build_model()
+        self.memory = []
 
     def _build_model(self):
         model = Sequential()
@@ -38,7 +39,7 @@ class FM:
                     pred_obs  = self.model.predict(np.reshape(pred_obs, [1, pred_obs.shape[0]]))
                     pred_obs = pred_obs[0].tolist()
 
-        pred_obs = np.array(pred_obs).reshape(int(len(pred_obs)/2), 2)
+        pred_obs = np.array(pred_obs).reshape(int(len(pred_obs)/2), 2).tolist()
 
         for m in range(len(GP.c_r_ms)):
             for n in range(GP.n_servers):
@@ -49,3 +50,17 @@ class FM:
                     pred_obs[idx][1] = int(pred_obs[idx][1]*GP.ypi_max)
         log.logger.debug('after prediction, pred_obs = \n%s' % (str(pred_obs)))
         return pred_obs
+
+    def train(self, batch_size):
+        if len(self.memory) <= batch_size:
+            return
+        index = np.random.choice(len(self.memory), batch_size)
+
+        obs_act_vec, obs_next_vec = [], []
+        for i in index:
+            obs_input, action, obs_output = self.memory[i]
+            obs_act_vec.append(np.array(obs_input.tolist() + [action]))
+            obs_next_vec.append(obs_output)
+        obs_act_vec = np.array(obs_act_vec)
+        obs_next_vec = np.array(obs_next_vec)
+        loss = self.model.fit(obs_act_vec, obs_next_vec, epochs=1, verbose=0)

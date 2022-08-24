@@ -14,7 +14,7 @@ if __name__ == '__main__':
         agent = NDDQN()
         GP.obs_delay = 0
     if GP.agent_type is 'ddqnMlp':
-        GP.obs_delay = 1
+        GP.obs_delay = 2
         agent = DDQNMLP(GP.obs_delay)
     for ep in range(GP.n_episode):
         SI.RESET(env, agent)

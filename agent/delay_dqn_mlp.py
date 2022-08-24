@@ -6,7 +6,7 @@ import utils.system_inner as SI
 import environment.compute_reward as CR
 import results.running_value as RV
 from utils.logger import log
-from agent.aiModels.dqn_agents import DDQNPlanningAgent
+from agent.aiModels.dqn_agents import DDQNAgent
 from agent.aiModels.forward_model import FM
 
 class DDQNMLP():
@@ -15,10 +15,12 @@ class DDQNMLP():
         self.delay = delay
         self.A, self.A_avai = [], []  # RODC-DDPG line-5
         self.sc = OBSRWD(-1, [[0,0] for _ in range(GP.n_ms_server*GP.n_servers*len(GP.c_r_ms))],None)  # latest observation RODC-DDPG Line-6
-        self.T = [[] for _ in range(2)]
+        self.T = []
         self.D = []
         #self.model = DDQNPlanningAgent(self.obs_dim, self.act_dim, False, False, 1, 0.001, 0.999, 0.001, 0.01, False, True, None, True)
         self.forward_model = FM()
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.001, 1, False, True)
+        self.step_num = 0
 
     def reset(self):
         pass
@@ -69,6 +71,7 @@ class DDQNMLP():
                     minor_reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
                     # log.logger.debug('minor reward = %f' % (minor_reward))
                     tmp_memory.append([obs_input, action, minor_reward, obs_next])
+                    self.forward_model.memory.append([obs_input[0:-3], action, obs_next[0:-3]])
 
                     if is_mapped_success is False:
                         obs_env = copy.deepcopy(last_obs_env)
@@ -79,7 +82,8 @@ class DDQNMLP():
                 else:
                     # log.logger.debug('req is mapped successfully')
                     valid_action.append(inter_actions)
-        RV.memory.append(tmp_memory)
+        if ts >= 0:
+            RV.memory.append(tmp_memory)
         n_successful_mapped_reqs = sum(reqs) - RV.mapped_succ_rate[-1]
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1] / sum(reqs)
         log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
@@ -88,6 +92,18 @@ class DDQNMLP():
 
 
     def receive_observation_s(self, obs, ts):
+        self.step_num += 1
+        if self.step_num % 10 == 0:
+            log.logger.debug('Training Forward Model...')
+            self.forward_model.train(32)
+        if self.step_num % 200 == 0:
+            log.logger.debug('Replacing DQN Target Network...')
+            self.model.update_target_model()
+        if len(self.model.memory) > 32 and self.step_num % 20 == 0:
+            log.logger.debug('Training DQN Model...')
+            batch_loss_dict = self.model.replay(32)
+
+
         log.logger.debug('[line-15][Check: id(sc)=%d, len(A)=%d]' % (self.sc.id, len(self.A)))
         if self.sc.id is -1 and len(self.A) is 0:
             action = self.compute_action(True, -1, copy.deepcopy(self.sc.value))
@@ -95,8 +111,8 @@ class DDQNMLP():
             self.A_avai.append(action)
             log.logger.debug('[line-16][initialize an action a[%d], len(A)=%d, len(A_avai)=%d]' % (action.id,len(self.A),len(self.A_avai)))
         else:
-            self.T[1].extend(obs)
-            log.logger.debug('[line-18][agent adds observations and rewards into T: len(T[1])=%d]' % (len(self.T[1])))
+            self.T.extend(obs)
+            log.logger.debug('[line-18][agent adds observations and rewards into T: len(T)=%d]' % (len(self.T)))
             if len(obs) is not 0:
                 O_avai = []
                 log.logger.debug('[line-7][Initialize the received observations O_avai: len(O_avai)=%d]' % (len(O_avai)))
@@ -120,8 +136,13 @@ class DDQNMLP():
         action = self.compute_action(False, ts, copy.deepcopy(pred_obs_env))
         self.A.append(action)
         log.logger.debug('[line-25][agent adds a[%d] into A: len(A)=%d, len(A_avai)=%d]' % (action.id, len(self.A), len(self.A_avai)))
-        self.T[0].append(action)
-        log.logger.debug('[line-26][agent adds a[%d] into T: len(T[0])=%d]'% (action.id, len(self.T[0])))
         log.logger.debug('[line-27][Check if exists adjacent obs]')
-        self.T[1].sort(key=lambda OBSRWD: OBSRWD.id, reverse=False)
+        for robs in self.T:
+            if robs.id == 0:
+                continue
+            for mem in RV.memory[robs.id - 1]:
+                mem[2] += robs.major_reward
+                self.model.memorize(mem[0], mem[1], mem[2], mem[3], False)
+        self.T.clear()
+                    
         return action
