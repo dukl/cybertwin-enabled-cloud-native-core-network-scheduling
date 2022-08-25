@@ -8,6 +8,7 @@ import results.running_value as RV
 from utils.logger import log
 from agent.aiModels.dqn_agents import DDQNAgent
 from agent.aiModels.forward_model import FM
+from agent.aiModels.pnn import PNN
 
 class DDQNMLP():
     def __init__(self, delay):
@@ -18,7 +19,8 @@ class DDQNMLP():
         self.T = []
         self.D = []
         #self.model = DDQNPlanningAgent(self.obs_dim, self.act_dim, False, False, 1, 0.001, 0.999, 0.001, 0.01, False, True, None, True)
-        self.forward_model = FM()
+        #self.forward_model = FM()
+        self.forward_model = PNN()
         self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.001, 1, False, True)
         self.step_num = 0
 
