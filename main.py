@@ -15,12 +15,9 @@ if __name__ == '__main__':
     env, agent = ENV(), None
     if GP.agent_type is 'nddqn':
         agent = NDDQN()
-        GP.obs_delay = 0
     if GP.agent_type is 'ddqnMlp':
-        GP.obs_delay = 1
         agent = DDQNMLP(GP.obs_delay)
     if GP.agent_type is 'turnAgt':
-        GP.obs_delay = 1 #random.randint(1,2)
         agent = TBA()
     for ep in range(GP.n_episode):
         SI.RESET(env, agent)
@@ -28,8 +25,10 @@ if __name__ == '__main__':
         for ts in range(GP.n_time_steps):
             RV.mapped_succ_rate.append(0)
             log.logger.debug('[line-9][Training Episode - %d][Time Step - %d]' % (ep, ts))
-            obs_rwd = env.send_obs_reward(ts)
-            RV.obs_on_road.append(obs_rwd)
+            if ts == 0 or RV.is_start_collect_env is True:
+                GP.obs_delay = 1 #random.randint(1, 2)
+                obs_rwd = env.send_obs_reward(ts)
+                RV.obs_on_road.append(obs_rwd)
             action = agent.receive_observation_s(SI.CHECK_OBSERVATIONS(ts), ts)
             env.act(action)
         log.logger.debug('Episode-%d reward: %f' % (ep, RV.episode_reward[-1]))

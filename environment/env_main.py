@@ -40,7 +40,9 @@ class ENV:
     def act(self, action):
         if action is None:
             RV.time_step_reward.append(-1)
+            RV.is_start_collect_env = False
             return
+        RV.is_start_collect_env = True
         log.logger.debug('before %d reqs, add %d reqs' % (len(self.left_reqs), len(action.value)))
         self.left_reqs += action.value
         #log.logger.debug('env running to process %d reqs' % (len(self.left_reqs)))
