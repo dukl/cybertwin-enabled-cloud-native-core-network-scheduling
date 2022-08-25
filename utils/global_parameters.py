@@ -2,7 +2,7 @@ import numpy.random
 
 n_episode = 1000
 n_time_steps = 100
-agent_type = 'ddqnMlp' # ['nddqn', 'ddqnMlp']
+agent_type = 'turnAgt' # ['nddqn', 'ddqnMlp', 'turnAgt']
 obs_delay = 0
 
 n_servers = 4
