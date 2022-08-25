@@ -79,12 +79,31 @@ class TBA:
         self.reqs = [0 for _ in range(len(GP.arrive_rate))]
         return ACT(ts, valid_action, RV.mapped_succ_rate[-1], n_successful_mapped_reqs)
 
+    def random_actions(self, ts):
+        log.logger.debug('Random Chosen...')
+        valid_action = []
+        for i in range(len(GP.msc)):
+            for j in range(self.reqs[i]):
+                inter_actions = []
+                for ms in GP.msc[i]:
+                    action = random.randint(0, GP.n_ms_server * GP.n_servers * (GP.ypi_max + 1) - 1)
+                    server_idx, inst_idx, n_threads = int(action / (GP.n_ms_server * (GP.ypi_max + 1))), int(
+                        (action % (GP.n_ms_server * (GP.ypi_max + 1))) / (GP.ypi_max + 1)), (
+                                                                  action % (GP.n_ms_server * (GP.ypi_max + 1))) % (
+                                                                  GP.ypi_max + 1)
+                    inter_actions.append([ms, server_idx, inst_idx, n_threads])
+                valid_action.append(inter_actions)
+        n_successful_mapped_reqs = sum(self.reqs)
+        self.reqs = [0 for _ in range(len(GP.arrive_rate))]
+        return ACT(ts, valid_action, 1.0, n_successful_mapped_reqs)
+
     def receive_observation_s(self, obs, ts):
         self.receive_requests()
         if len(obs) == 0:
             log.logger.debug('Agent doesn\'t receive any obs at time %d' % (ts))
+            action = self.random_actions(ts)
             RV.memory.append(None)
-            return None
+            return action
         for o in obs:
             if o.major_reward != -1 and RV.memory[o.id-1] is not None:
                 for mem in RV.memory[o.id - 1]:
