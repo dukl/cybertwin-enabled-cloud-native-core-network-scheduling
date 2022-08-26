@@ -43,7 +43,7 @@ class PNN():
         self.tf_sc     = tf.placeholder(shape=[1, self.state_dim], dtype=tf.float32)
         self.tf_A_avai = tf.placeholder(shape=[None, 1, self.act_dim], dtype=tf.float32)
         self.create_forward_model()
-        self.memory = deque(maxlen=400000)
+        self.memory = []
         self.train_in = np.array([]).reshape(
             0, self.state_dim+self.act_dim
         )
@@ -104,15 +104,26 @@ class PNN():
     def train(self, batch_size):
         if len(self.memory) <= batch_size:
             return
-        samples = random.sample(self.memory, batch_size)
-        new_train_in, new_train_target = [], []
-        for sample in samples:
-            s_t, a_t, s_t1 = sample[0], sample[1], sample[2]
-            new_train_in.append(np.concatenate([s_t, a_t], axis=-1))
-            new_train_target.append(s_t1)
-        self.train_in = np.concatenate([self.train_in]+new_train_in, axis=0)
-        self.train_target = np.concatenate([self.train_target]+new_train_target, axis=0)
-        self._train(self.train_in, self.train_target)
+
+        index = np.random.choice(len(self.memory), batch_size)
+
+        obs_act_vec, obs_next_vec = [], []
+        for i in index:
+            obs_input, action, obs_output = self.memory[i]
+            obs_act_vec.append(np.array(obs_input.tolist() + [action]))
+            obs_next_vec.append(obs_output)
+        obs_act_vec = np.array(obs_act_vec)
+        obs_next_vec = np.array(obs_next_vec)
+
+        #new_train_in, new_train_target = [], []
+        #for i in index:
+        #    s_t, a_t, s_t1 = self.memory[i]
+        #    new_train_in.append(np.concatenate([s_t, np.array([a_t])], axis=-1))
+        #    new_train_target.append(s_t1)
+        #self.train_in = np.concatenate([self.train_in]+new_train_in, axis=0)
+        #self.train_target = np.concatenate([self.train_target]+new_train_target, axis=0)
+        #self._train(self.train_in, self.train_target)
+        self._train(obs_act_vec, obs_next_vec)
 
     def _train(self, inputs, targets, batch_size=32, epochs=100, hide_progress=False, holdout_ratio=0.0, max_logging=5000, misc=None):
         def shuffle_rows(arr):
@@ -173,14 +184,29 @@ class PNN():
                     act_value = s*GP.n_ms_server*(GP.ypi_max+1) + i * (GP.ypi_max+1) + n
                     actV.append(act_value)
         actV = np.array(actV)
-        print(actV.shape)
         actV = actV.reshape(actV.shape[0], 1, 1)
 
         pred_state = self.sess.run(
             tf_pred_obs, feed_dict={self.tf_sc:scV, self.tf_A_avai:actV}
         )
+        #log.logger.debug('out from model prediction, pred_obs = \n%s' % (str(pred_state)))
+
+        pred_state = pred_state[0].reshape(int(pred_state[0].shape[0]/2), 2)
+        #pred_state = pred_state.astype('float32')
+        #pred_state[:,0] = (np.max(pred_state[:,0]) - pred_state[:,0])/(np.max(pred_state[:,0] - np.min(pred_state[:,0])))
+        #pred_state[:,1] = (np.max(pred_state[:,1]) - pred_state[:,1])/(np.max(pred_state[:,1] - np.min(pred_state[:,1])))
+        pred_state = pred_state.tolist()
+
+        for m in range(len(GP.c_r_ms)):
+            for n in range(GP.n_servers):
+                for i in range(GP.n_ms_server):
+                    idx = m * GP.n_servers * GP.n_ms_server + n * GP.n_ms_server + i
+                    # log.logger.debug('lamda=%f, n_threads=%f' % (obs_env[idx][0], obs_env[idx][1]))
+                    pred_state[idx][0] = int(pred_state[idx][0]*GP.lamda_ms[m])
+                    pred_state[idx][1] = int(pred_state[idx][1]*GP.ypi_max)
+
         log.logger.debug('after prediction, pred_obs = \n%s' % (str(pred_state)))
-        return pred_state[0].tolist()
+        return pred_state
 
     def create_prediction_tensors(self, inputs, factored=False, *args, **kwargs):
         factored_mean, factored_variance = self._compile_outputs(inputs)
@@ -225,7 +251,7 @@ class PNN():
         self.add(FC(200, activation="swish", weight_decay=0.000075))
         self.add(FC(200, activation="swish", weight_decay=0.000075))
         self.add(FC(self.state_dim, weight_decay=0.0001))
-        self.finalize(tf.train.AdamOptimizer, {"learning_rate": 0.001})
+        self.finalize(tf.train.AdamOptimizer, {"learning_rate": 0.0001})
 
     def tf_predict_state(self, n):
         idx = tf.constant(0)
@@ -235,7 +261,7 @@ class PNN():
             cur_acs = self.tf_A_avai[idx]
             inputs = tf.concat([sc, cur_acs], axis=-1)
             mean, var = self.create_prediction_tensors(inputs)
-            return idx + 1, mean + sc
+            return idx + 1, (tf.reduce_max(mean + sc) - (mean + sc))/(tf.reduce_max(mean+sc) - tf.reduce_min(mean+sc))
         _, pred_state = tf.while_loop(
             cond=continue_prediction, body=iteration, loop_vars=[idx, self.tf_sc],
             shape_invariants=[

@@ -26,7 +26,7 @@ if __name__ == '__main__':
             RV.mapped_succ_rate.append(0)
             log.logger.debug('[line-9][Training Episode - %d][Time Step - %d]' % (ep, ts))
             if ts == 0 or RV.is_start_collect_env is True:
-                GP.obs_delay = random.randint(1, 5)
+                GP.obs_delay = 1#random.randint(1, 5)
                 obs_rwd = env.send_obs_reward(ts)
                 RV.obs_on_road.append(obs_rwd)
             action = agent.receive_observation_s(SI.CHECK_OBSERVATIONS(ts), ts)
