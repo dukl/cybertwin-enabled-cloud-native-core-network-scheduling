@@ -2,6 +2,7 @@ import utils.global_parameters as GP
 from utils.obs_reward_action_def import OBSRWD
 from utils.logger import log
 import results.running_value as RV
+import numpy as np
 
 
 class NF:
@@ -33,8 +34,10 @@ class ENV:
         for t in range(len(GP.c_r_ms)):
             for i in range(GP.n_servers):
                 for j in range(GP.n_ms_server):
+                    #log.logger.debug('%d' % (t*GP.n_servers*GP.n_ms_server+i*GP.n_ms_server+j))
                     obs.append([self.nfs[t][i*GP.n_ms_server+j].lamda, self.nfs[t][i*GP.n_ms_server+j].n_threads])
-        #log.logger.debug('obs[%d]=\n%s' % (ts, str(obs)))
+        log.logger.debug('obs[%d]=\n%s' % (ts, str(obs)))
+        log.logger.debug('total reqs left: %d' % (np.sum(np.array(obs)[:,0])))
         return OBSRWD(ts, obs, RV.time_step_reward[-1])
 
     def act(self, action):
@@ -54,6 +57,7 @@ class ENV:
                 self.nfs[m][s * GP.n_ms_server + i].n_threads += n
                 if self.nfs[m][s * GP.n_ms_server + i].n_threads > GP.ypi_max:
                     self.nfs[m][s * GP.n_ms_server + i].n_threads = GP.ypi_max
+
         total_time = 0
         index = 0
         Q_t = 0
@@ -87,7 +91,9 @@ class ENV:
         else:
             Q_t = Q_t/(len(self.left_reqs))
         #log.logger.debug('Q_t = %f' % (Q_t))
-        major_reward = action.n_mapped_succ_rate * Q_t*action.total_reqs*GP.beta_r
+        #major_reward = action.n_mapped_succ_rate * Q_t*action.total_reqs / (GP.n_reqs_per_msc * len(GP.msc))
+        #major_reward = action.n_mapped_succ_rate * 5 + 10
+        #major_reward += (Q_t * 5 + 20)
         #major_reward = action.n_mapped_succ_rate * Q_t * GP.beta_r
         #log.logger.debug('major reward-1 = %f' % (major_reward))
 
@@ -99,9 +105,14 @@ class ENV:
 
         log.logger.debug('sum_threads = %d, max_threads = %d, resource_rate = %f' % (sum_threads, GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms), (1-sum_threads/(GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))))
         resource_rate = 1 - (sum_threads / (GP.n_ms_server*GP.n_servers*GP.ypi_max*len(GP.c_r_ms)))
-        major_reward *= resource_rate
+        #major_reward *= resource_rate
         log.logger.debug('detailed-reward: succ_rate=%f, Q_t=%f, total_req=%d, resource_rate=%f' % (action.n_mapped_succ_rate, Q_t, action.total_reqs, resource_rate))
-        log.logger.debug('time step major reward = %f' % (major_reward))
+        #log.logger.debug('time step major reward = %f' % (major_reward))
+        #major_reward = major_reward * GP.beta_r + GP.beta_r
+        major_reward = (resource_rate * 10 + 10)
+        major_reward += (Q_t * 10 + 20)
+        major_reward += (action.n_mapped_succ_rate * 10 + 30)
+        log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % ((resource_rate * 10 + 10), (action.n_mapped_succ_rate * 10 + 30), (Q_t * 10 + 20), major_reward))
         RV.time_step_reward.append(major_reward)
         RV.episode_reward[-1] += major_reward
 
@@ -113,5 +124,6 @@ class ENV:
                 ##log.logger.debug('minus [%d,%d,%d].n_threads = %d' % (m,s,i,n))
                 self.nfs[m][s * GP.n_ms_server + i].n_threads -= n
                 if self.nfs[m][s * GP.n_ms_server + i].n_threads < 0:
-                    self.nfs[m][s * GP.n_ms_server + i].n_threads = 1
+                    self.nfs[m][s * GP.n_ms_server + i].n_threads = 0
+
 

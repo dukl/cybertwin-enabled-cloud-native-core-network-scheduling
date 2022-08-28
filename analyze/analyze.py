@@ -10,7 +10,7 @@ np_reward_mean = []
 np_reward_var  = []
 labels         = []
 
-date = '0826'
+date = '0828'
 print(os.listdir(date+'/'))
 n_files = 0
 

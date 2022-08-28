@@ -13,7 +13,7 @@ class NDDQN:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
         #self.model = DQN(self.act_dim, self.obs_dim)
-        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.001, 1, False, True)
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.0001, 1, False, True)
         self.step_num = 0
 
     def reset(self):
@@ -33,7 +33,8 @@ class NDDQN:
         #log.logger.debug('major reward = %f' % obs[0].major_reward)
         if ts > 0:
             for mem in RV.memory[-1]:
-                #log.logger.debug('minor-reward=%f' % (mem[2]))
+                #log.logger.debug('memory [\n%s\n, %d, %f, \n%s\n]' % (str(mem[0]), mem[1], mem[2], str(mem[3])))
+                #log.logger.debug('minor-reward=%f, major-reward=%f' % (mem[2], obs[0].major_reward))
                 mem[2] += obs[0].major_reward
                 #log.logger.debug('major-reward=%f, total-reward=%f' % (obs[0].major_reward, mem[2]))
                 #RV.modified_memory.append(mem)
@@ -55,9 +56,11 @@ class NDDQN:
                 is_req_mapped_success = True
                 inter_actions = []
                 last_obs_env_req = copy.deepcopy(obs_env)
+                #log.logger.debug('mapping req[%d, %d], obs_env = \n%s' % (i, j, str(last_obs_env_req)))
                 for ms in GP.msc[i]:
                     is_mapped_success = True
                     last_obs_env = copy.deepcopy(obs_env)
+                    #log.logger.debug('mapping req-ms[%d, %d, %d], obs_env = \n%s' % (i, j, ms, str(last_obs_env)))
                     obs_req = [i, reqs[i], ms]
                     norm_obs_env = SI.NORM_STATE(copy.deepcopy(obs_env))
                     obs_input = numpy.array([b for a in norm_obs_env for b in a] + obs_req)
@@ -68,6 +71,7 @@ class NDDQN:
                     action = self.model.act(obs_input, eval=False)
                     server_idx, inst_idx, n_threads = int(action/(GP.n_ms_server*(GP.ypi_max+1))), int((action%(GP.n_ms_server*(GP.ypi_max+1)))/(GP.ypi_max+1)), (action%(GP.n_ms_server*(GP.ypi_max+1)))%(GP.ypi_max+1)
                     #log.logger.debug('action=%d -> server_idx=%d, inst_idx=%d, n_threads=%d' % (action, server_idx, inst_idx, n_threads))
+                    #log.logger.debug('action: [%d, %d, %d, %d]' % (ms, server_idx, inst_idx, n_threads))
                     idx = ms*GP.n_servers*GP.n_ms_server + server_idx*GP.n_ms_server + inst_idx
                     #log.logger.debug('trying to map req=(%d,%d,%d) into instance=(%d,%d,%d) n_threads=%d' % (i, j, ms, ms, server_idx, inst_idx, n_threads))
                     if SI.CHECK_VALID_ACTION(obs_env, idx, n_threads):
@@ -90,17 +94,20 @@ class NDDQN:
 
                     if is_mapped_success is False:
                         obs_env = copy.deepcopy(last_obs_env)
+                        #log.logger.debug('req-ms is mapped unsuccessfully')
                 if is_req_mapped_success is False:
                     RV.mapped_succ_rate[-1] += 1
                     #log.logger.debug('req is mapped unsuccessfully')
                     obs_env = copy.deepcopy(last_obs_env_req)
                 else:
                     #log.logger.debug('req is mapped successfully')
+                    #for m,s,i,n in inter_actions:
+                        #log.logger.debug('valid action: [%d, %d, %d, %d]' % (m, s, i, n))
                     valid_action.append(inter_actions)
         RV.memory.append(tmp_memory)
         n_successful_mapped_reqs = sum(reqs) - RV.mapped_succ_rate[-1]
         RV.mapped_succ_rate[-1] = 1 - RV.mapped_succ_rate[-1]/sum(reqs)
-        log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs))
+        log.logger.debug('t=%d, successful mapped rate = %f, n_successful_mapped_reqs = %d, total_reqs = %d' % (ts, RV.mapped_succ_rate[-1], n_successful_mapped_reqs, sum(reqs)))
         ##log.logger.debug('agent-obs[%d]=\n%s' % (ts+1, str(obs_env)))
         return ACT(ts, valid_action, RV.mapped_succ_rate[-1], n_successful_mapped_reqs)
 

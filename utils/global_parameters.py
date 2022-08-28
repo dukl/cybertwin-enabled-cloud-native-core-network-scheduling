@@ -2,7 +2,7 @@ import numpy.random
 
 n_episode = 1000
 n_time_steps = 100
-agent_type = 'ddqnMlp' # ['nddqn', 'ddqnMlp', 'turnAgt']
+agent_type = 'nddqn' # ['nddqn', 'ddqnMlp', 'turnAgt']
 obs_delay = 0
 
 n_servers = 4
@@ -12,7 +12,7 @@ ypi_max = 8
 c_r_ms = [25, 36, 34, 24, 25, 15]
 psi_ms = [92, 52, 99, 68, 78, 112]
 w_ms   = [10, 12, 9, 5, 6, 8]
-lamda_ms = [100, 104, 110, 210, 120, 130]
+lamda_ms = [20, 24, 15, 30, 23, 26]
 
 n_cpu_core = 3
 cpu = 8000
@@ -28,10 +28,12 @@ msc = [
     [2,3,4,5]
 ]
 
-arrive_rate = numpy.random.normal(5, 1, 10)
+n_reqs_per_msc = 5
 
-one_step_time = 1500
+arrive_rate = numpy.random.normal(n_reqs_per_msc, 0, 10)
 
-beta_r = 2
+one_step_time = 30000
+
+beta_r = 10
 
 n_ensemble = 5
