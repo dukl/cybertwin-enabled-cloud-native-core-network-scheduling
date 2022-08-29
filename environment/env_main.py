@@ -65,8 +65,10 @@ class ENV:
             sum = 0
             sum_max = 0
             sum_min = 0
+
             for act in self.left_reqs[r]:
                 [m, s, i, n] = act
+                #log.logger.debug('instance [%d,%d,%d] has %d mapped reqs/max_reqs = %d' % (m, s, i, self.nfs[m][s * GP.n_ms_server + i].lamda, GP.lamda_ms[m]))
                 if self.nfs[m][s * GP.n_ms_server + i].n_threads == 0:
                     self.nfs[m][s * GP.n_ms_server + i].n_threads = 1
                 #log.logger.debug('[%d,%d,%d].lamda = %d' % (m,s,i, self.nfs[m][s * GP.n_ms_server + i].lamda))
@@ -74,9 +76,19 @@ class ENV:
                 sum += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / self.nfs[m][s * GP.n_ms_server + i].n_threads + 1/(GP.cpu/GP.psi_ms[m] - 1)
                 sum_max += GP.lamda_ms[m]*GP.w_ms[m] / 1 + 1/(GP.cpu/GP.psi_ms[m] - 1)
                 sum_min += self.nfs[m][s * GP.n_ms_server + i].lamda * GP.w_ms[m] / GP.ypi_max + 1/(GP.cpu/GP.psi_ms[m] - 1)
-                self.nfs[m][s * GP.n_ms_server + i].lamda -= 1
+
+                #self.nfs[m][s * GP.n_ms_server + i].lamda -= 1
             #log.logger.debug('response time = %f, max = %f, min = %f, q_t = %f' % (sum, sum_max, sum_min, (sum_max - sum)/(sum_max - sum_min)))
-            Q_t += (sum_max - sum)/(sum_max - sum_min)
+            #Q_t += (sum_max - sum)/(sum_max - sum_min)
+            #r_req = (1 - sum/sum_max)
+            #if r_req < (1 - sum_min/sum_max)*0.9:
+            #    Q_t += r_req
+                #log.logger.debug('normal reward')
+            #else:
+            #    Q_t += ((1 - sum_min/sum_max)*0.9 - (r_req - (1 - sum_min/sum_max)*0.9)/(1 - sum_min/sum_max)*0.9)
+                #log.logger.debug('exceed range reward')
+
+            Q_t += (1 - sum/sum_max)
             total_time += sum
             #log.logger.debug('total response time = %f' % (total_time))
             if total_time > GP.one_step_time:
@@ -125,5 +137,6 @@ class ENV:
                 self.nfs[m][s * GP.n_ms_server + i].n_threads -= n
                 if self.nfs[m][s * GP.n_ms_server + i].n_threads < 0:
                     self.nfs[m][s * GP.n_ms_server + i].n_threads = 0
+                self.nfs[m][s * GP.n_ms_server + i].lamda -= 1
 
 

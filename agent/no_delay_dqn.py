@@ -13,7 +13,7 @@ class NDDQN:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
         #self.model = DQN(self.act_dim, self.obs_dim)
-        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.0001, 1, False, True)
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.9, 0.0001, 1.0, False, True)
         self.step_num = 0
 
     def reset(self):
@@ -47,7 +47,7 @@ class NDDQN:
             log.logger.debug('Replacing...')
             self.model.update_target_model()
         batch_size = 32
-        if len(self.model.memory) > batch_size and self.step_num % 10 == 0:
+        if len(self.model.memory) > batch_size and self.step_num % 20 == 0:
             log.logger.debug('Training...')
             batch_loss_dict = self.model.replay(batch_size)
         tmp_memory = []
