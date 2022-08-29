@@ -3,6 +3,7 @@ from utils.obs_reward_action_def import OBSRWD
 from utils.logger import log
 import results.running_value as RV
 import numpy as np
+import math
 
 
 class NF:
@@ -124,7 +125,11 @@ class ENV:
         major_reward = (resource_rate * 10 + 10)
         major_reward += (Q_t * 10 + 20)
         major_reward += (action.n_mapped_succ_rate * 10 + 30)
-        log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % ((resource_rate * 10 + 10), (action.n_mapped_succ_rate * 10 + 30), (Q_t * 10 + 20), major_reward))
+        log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % ((resource_rate * 10 + 10), (Q_t * 10 + 20), (action.n_mapped_succ_rate * 10 + 30), major_reward))
+        #major_reward = math.exp(2*Q_t) + 20
+        #major_reward += math.exp(resource_rate) + 10
+        #major_reward += (2 - math.exp(-2*action.n_mapped_succ_rate)) + 30
+        #log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % ((2 - math.exp(-2*action.n_mapped_succ_rate)) + 30, math.exp(2*Q_t) + 20, math.exp(resource_rate) + 10, major_reward))
         RV.time_step_reward.append(major_reward)
         RV.episode_reward[-1] += major_reward
 

@@ -69,7 +69,8 @@ class NDDQN:
                     #action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
                     #action = self.model.choose_action(obs_input)
                     action = self.model.act(obs_input, eval=False)
-                    server_idx, inst_idx, n_threads = int(action/(GP.n_ms_server*(GP.ypi_max+1))), int((action%(GP.n_ms_server*(GP.ypi_max+1)))/(GP.ypi_max+1)), (action%(GP.n_ms_server*(GP.ypi_max+1)))%(GP.ypi_max+1)
+                    server_idx, inst_idx, n_threads = int(action/(GP.n_ms_server*(GP.ypi_max))), int((action%(GP.n_ms_server*(GP.ypi_max)))/(GP.ypi_max)), (action%(GP.n_ms_server*(GP.ypi_max)))%(GP.ypi_max)
+                    n_threads += 1
                     #log.logger.debug('action=%d -> server_idx=%d, inst_idx=%d, n_threads=%d' % (action, server_idx, inst_idx, n_threads))
                     #log.logger.debug('action: [%d, %d, %d, %d]' % (ms, server_idx, inst_idx, n_threads))
                     idx = ms*GP.n_servers*GP.n_ms_server + server_idx*GP.n_ms_server + inst_idx

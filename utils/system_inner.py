@@ -45,7 +45,7 @@ def CHECK_VALID_ACTION(obs_env, index, n_threads):
     return True
 
 def CHECK_ACT_OBS_DIM():
-    return GP.n_servers*GP.n_ms_server*len(GP.c_r_ms)*2 + 3, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)
+    return GP.n_servers*GP.n_ms_server*len(GP.c_r_ms)*2 + 3, GP.n_ms_server*GP.n_servers*(GP.ypi_max)
 
 def RESET(env, agent):
     env.reset()
