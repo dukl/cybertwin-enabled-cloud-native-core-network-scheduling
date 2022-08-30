@@ -13,7 +13,7 @@ class NDDQN:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
         #self.model = DQN(self.act_dim, self.obs_dim)
-        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.0001, 0.1, False, True)
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.001, 0.5, False, True)
         print(self.model.model.summary())
         self.step_num = 0
         self.req_index = [0 for _ in range(len(GP.msc))]
@@ -50,10 +50,10 @@ class NDDQN:
         #self.model.learn()
         self.step_num += 1
         batch_size = 32
-        if len(self.model.memory) > batch_size and self.step_num % 100 == 0:
+        if len(self.model.memory) > batch_size and self.step_num % 200 == 0:
             log.logger.debug('Replacing...')
             self.model.update_target_model()
-        if len(self.model.memory) > batch_size and self.step_num % 10 == 0:
+        if len(self.model.memory) > batch_size and self.step_num % 50 == 0:
             log.logger.debug('Training...')
             batch_loss_dict = self.model.replay(batch_size)
         tmp_memory = []
@@ -87,6 +87,7 @@ class NDDQN:
                     else:
                         is_mapped_success = False
                         is_req_mapped_success = False
+                        #log.logger.debug('mapped failed for req(%d-%d-%d), action(%d-%d-%d-%d)' % (i, j+self.req_index[i], ms, server_idx, inst_idx, n_threads, idx))
                         #log.logger.debug('punish action = %d' % (action))
                     obs_env[idx][0] += 1
                     obs_env[idx][1] += n_threads

@@ -20,23 +20,29 @@ class NF:
         #log.logger.debug('inst(%d-%d) has resources(%d-%d), n_reqs=%d' % (self.id[0], self.id[1], self.lamda, self.n_threads, len(self.reqs)))
         running_time = 0
         index = 0
+        if self.n_threads == 0:
+            return
+        average_time = self.lamda * GP.w_ms[self.id[0]] / self.n_threads + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
+        one_msg_time = 2*average_time/(self.lamda+1)
+        process_time_max = GP.lamda_ms[self.id[0]] * GP.w_ms[self.id[0]] + 1 / (GP.cpu / GP.psi_ms[self.id[0]] - 1)
+        #log.logger.debug('one_msg_time = %f' % (one_msg_time))
         while True:
             index += 1
             if len(self.reqs) == 0 or self.n_threads == 0:
                 #log.logger.debug('total running time = %f' % (running_time))
                 break
-            if index <= self.old_lamda:
-                lamda = self.old_lamda
-                n_threads = self.old_n_threads
-                #log.logger.debug('using old resources')
-            else:
-                lamda = self.lamda
-                n_threads = self.n_threads
+            #if index <= self.old_lamda:
+            #    lamda = self.old_lamda - index + 1
+            #    n_threads = GP.ypi_max
+            #    log.logger.debug('using old resources')
+            #else:
+            #    lamda = self.lamda
+            #    n_threads = self.n_threads
             req = self.reqs[0]
             del self.reqs[0]
-            process_time = lamda * GP.w_ms[self.id[0]] / n_threads + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
-            process_time_max = GP.lamda_ms[self.id[0]] * GP.w_ms[self.id[0]] + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
-            running_time += process_time
+            #process_time = self.lamda * GP.w_ms[self.id[0]] / self.n_threads + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
+            process_time = index * one_msg_time
+            running_time += one_msg_time
             self.lamda -= 1
             if running_time > GP.one_step_time:
                 #log.logger.debug('total running time = %f, inst(%d-%d) has not been processed req(%d-%d-%d), return' % (running_time, self.id[0], self.id[1], req[0], req[1], self.id[0]))
@@ -46,8 +52,8 @@ class NF:
             else:
                 self.processed_reqs.append(req + [process_time, process_time_max])
             #log.logger.debug('inst(%d-%d) has processed req(%d-%d-%d) for %f' % (self.id[0], self.id[1], req[0], req[1], self.id[0], process_time))
-        self.old_lamda = self.lamda
-        self.old_n_threads = self.n_threads
+        #self.old_lamda = self.lamda
+        #self.old_n_threads = self.n_threads
         #log.logger.debug('inst(%d-%d) resources: lamda=%d, n_threads=%d' % (self.id[0], self.id[1], self.lamda, self.n_threads))
         #log.logger.debug('proposed reqs:')
         #for req in self.processed_reqs:
@@ -106,6 +112,14 @@ class ENV:
                 self.nfs[m][s * GP.n_ms_server + i].n_threads += n
                 if self.nfs[m][s * GP.n_ms_server + i].n_threads > GP.ypi_max:
                     self.nfs[m][s * GP.n_ms_server + i].n_threads = GP.ypi_max
+        #obs = []
+        #for t in range(len(GP.c_r_ms)):
+        #    for i in range(GP.n_servers):
+        #        for j in range(GP.n_ms_server):
+        #            # log.logger.debug('%d' % (t*GP.n_servers*GP.n_ms_server+i*GP.n_ms_server+j))
+        #            obs.append(
+        #                [self.nfs[t][i * GP.n_ms_server + j].lamda, self.nfs[t][i * GP.n_ms_server + j].n_threads])
+        #log.logger.debug('obs after action =\n%s' % (str(obs)))
 
         for m in range(len(GP.c_r_ms)):
             for n in range(GP.n_servers):

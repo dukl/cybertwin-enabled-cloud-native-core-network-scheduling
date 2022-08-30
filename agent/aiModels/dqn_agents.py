@@ -56,8 +56,8 @@ class DQNAgent:
         self.model = self._build_model(loss=loss)
         self.use_m_step_reward = use_m_step_reward
         self.use_latest_reward = use_latest_reward
-        self.epsilon_increment = 0.001
-        self.epsilon_max = 1.0
+        self.epsilon_increment = 0.005
+        self.epsilon_max = 0.9
 
 
     def _huber_loss(self, y_true, y_pred, clip_delta=1.0):
