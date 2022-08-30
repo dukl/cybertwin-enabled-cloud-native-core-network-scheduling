@@ -13,17 +13,23 @@ class NDDQN:
     def __init__(self):
         self.obs_dim, self.act_dim = SI.CHECK_ACT_OBS_DIM()
         #self.model = DQN(self.act_dim, self.obs_dim)
-        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.9, 0.0001, 1.0, False, True)
+        self.model = DDQNAgent(self.obs_dim, self.act_dim, False, False, 0, 0.001, 0.999, 0.0001, 0.1, False, True)
+        print(self.model.model.summary())
         self.step_num = 0
+        self.req_index = [0 for _ in range(len(GP.msc))]
+        self.learn_index = 0
 
     def reset(self):
         self.step_num = 0
+        self.learn_index = 0
+        self.req_index = [0 for _ in range(len(GP.msc))]
 
     def receive_requests(self):
         reqs = [0 for _ in range(len(GP.arrive_rate))]
         for i in range(len(GP.msc)):
             loc = random.randint(0,9)
             reqs[i] = int(GP.arrive_rate[loc])
+            self.req_index[i] += reqs[i]
         return reqs
 
     def receive_observation_s(self, obs, ts):
@@ -43,11 +49,11 @@ class NDDQN:
             RV.memory.clear()
         #self.model.learn()
         self.step_num += 1
-        if self.step_num % 200 == 0:
+        batch_size = 32
+        if len(self.model.memory) > batch_size and self.step_num % 100 == 0:
             log.logger.debug('Replacing...')
             self.model.update_target_model()
-        batch_size = 32
-        if len(self.model.memory) > batch_size and self.step_num % 20 == 0:
+        if len(self.model.memory) > batch_size and self.step_num % 10 == 0:
             log.logger.debug('Training...')
             batch_loss_dict = self.model.replay(batch_size)
         tmp_memory = []
@@ -61,10 +67,11 @@ class NDDQN:
                     is_mapped_success = True
                     last_obs_env = copy.deepcopy(obs_env)
                     #log.logger.debug('mapping req-ms[%d, %d, %d], obs_env = \n%s' % (i, j, ms, str(last_obs_env)))
-                    obs_req = [i, reqs[i], ms]
+                    obs_req = [(i+1)/len(GP.msc), reqs[i]/GP.n_reqs_per_msc, (ms+1)/len(GP.c_r_ms)]
                     norm_obs_env = SI.NORM_STATE(copy.deepcopy(obs_env))
                     obs_input = numpy.array([b for a in norm_obs_env for b in a] + obs_req)
-                    #obs_input[obs_input==0] = 0.0001
+                    #log.logger.debug('obs_input=\n%s' % (str(obs_input.tolist())))
+                    obs_input[obs_input==0] = 0.0001
                     ##log.logger.debug('obs_input=\n%s' % (str(obs_input)))
                     #action = random.randint(0, GP.n_ms_server*GP.n_servers*(GP.ypi_max+1)-1)
                     #action = self.model.choose_action(obs_input)
@@ -76,7 +83,7 @@ class NDDQN:
                     idx = ms*GP.n_servers*GP.n_ms_server + server_idx*GP.n_ms_server + inst_idx
                     #log.logger.debug('trying to map req=(%d,%d,%d) into instance=(%d,%d,%d) n_threads=%d' % (i, j, ms, ms, server_idx, inst_idx, n_threads))
                     if SI.CHECK_VALID_ACTION(obs_env, idx, n_threads):
-                        inter_actions.append([ms, server_idx, inst_idx, n_threads])
+                        inter_actions.append([ms, server_idx, inst_idx, n_threads, i, j+self.req_index[i]])
                     else:
                         is_mapped_success = False
                         is_req_mapped_success = False
@@ -87,9 +94,10 @@ class NDDQN:
                         obs_env[idx][1] = GP.ypi_max
                     norm_obs_env_next = SI.NORM_STATE(copy.deepcopy(obs_env))
                     obs_next = numpy.array([b for a in norm_obs_env_next for b in a] + obs_req)
-                    #obs_next[obs_next==0] = 0.0001
+                    #log.logger.debug('obs_next=\n%s' % (str(obs_next.tolist())))
+                    obs_next[obs_next==0] = 0.0001
                     minor_reward = CR.compute_minor_reward(is_mapped_success, GP.msc[i].index(ms), reqs, i, obs_env[idx], ms, n_threads)
-                    #log.logger.debug('minor reward = %f' % (minor_reward))
+                    #log.logger.debug('action = %d, minor reward = %f' % (action, minor_reward))
 
                     tmp_memory.append([obs_input, action, minor_reward, obs_next])
 

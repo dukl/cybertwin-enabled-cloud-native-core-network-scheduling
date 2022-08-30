@@ -12,7 +12,7 @@ ypi_max = 8
 c_r_ms = [25, 36, 34, 24, 25, 15]
 psi_ms = [92, 52, 99, 68, 78, 112]
 w_ms   = [10, 12, 9, 5, 6, 8]
-lamda_ms = [20, 24, 18, 30, 23, 26]
+lamda_ms = [60, 64, 68, 60, 63, 66]
 
 n_cpu_core = 3
 cpu = 8000
@@ -28,11 +28,11 @@ msc = [
     [2,3,4,5]
 ]
 
-n_reqs_per_msc = 5
+n_reqs_per_msc = 10
 
 arrive_rate = numpy.random.normal(n_reqs_per_msc, 0, 10)
 
-one_step_time = 500
+one_step_time = 100
 
 beta_r = 10
 

@@ -56,6 +56,8 @@ class DQNAgent:
         self.model = self._build_model(loss=loss)
         self.use_m_step_reward = use_m_step_reward
         self.use_latest_reward = use_latest_reward
+        self.epsilon_increment = 0.001
+        self.epsilon_max = 1.0
 
 
     def _huber_loss(self, y_true, y_pred, clip_delta=1.0):
@@ -90,9 +92,12 @@ class DQNAgent:
             model.add(Dense(64, activation='relu'))
             model.add(Dense(output_size, activation='linear'))
         else:
-            model.add(Dense(24, input_dim=input_size, activation='relu'))
-            model.add(Dense(24, activation='relu'))
-            model.add(Dense(output_size, activation='linear'))
+            model.add(Dense(1024, input_dim=input_size, activation='relu'))
+            model.add(Dense(1024, activation='relu'))
+            model.add(Dense(1024, activation='relu'))
+            model.add(Dense(1024, activation='relu'))
+            model.add(Dense(512, activation='relu'))
+            model.add(Dense(output_size, activation='softmax'))
 
         model.compile(loss=loss,
                       optimizer=Adam(lr=self.learning_rate))
@@ -119,7 +124,8 @@ class DQNAgent:
             self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, eval=False):
-        if not eval and np.random.rand() <= self.epsilon:
+        #log.logger.debug('action epsilon = %f' % (self.epsilon))
+        if not eval and np.random.rand() > self.epsilon:
             #log.logger.debug('[DQN][Chose Action Randomly]')
             return random.randrange(self.action_size)
         #log.logger.debug('[DQN][Chose Action With DQN Model]')
@@ -222,11 +228,13 @@ class DDQNAgent(DQNAgent):
         loss = {}
         indices = np.random.choice(len(self.memory), batch_size)
         batch = self._create_batch(indices)
-        ##log.logger.debug('batch: \n%s' % (str(batch)))
+        #log.logger.debug('batch: \n%s' % (str(batch)))
         sample_loss = self.train_model(batch)
         update_loss(loss, sample_loss)
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+        self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
+        log.logger.debug('training epsilon = %f' % (self.epsilon))
+        #if self.epsilon > self.epsilon_min:
+        #    self.epsilon *= self.epsilon_decay
         return loss
 
 class DDQNPlanningAgent(DDQNAgent):

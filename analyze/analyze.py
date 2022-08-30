@@ -10,13 +10,15 @@ np_reward_mean = []
 np_reward_var  = []
 labels         = []
 
-date = '0828'
+date = '0830'
 print(os.listdir(date+'/'))
 n_files = 0
 
 for file in os.listdir(date+'/'):
     print(file)
     if re.search(r"log", file) is None:
+        continue
+    if re.search(r"no-delay-01", file) is None:
         continue
     n_files += 1
     labels.append(file)
