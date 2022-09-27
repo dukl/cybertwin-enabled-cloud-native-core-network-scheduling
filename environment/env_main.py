@@ -27,6 +27,9 @@ class NF:
         average_time = self.lamda * GP.w_ms[self.id[0]] / self.n_threads + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
         one_msg_time = 2*average_time/(self.lamda+1)
         process_time_max = GP.lamda_ms[self.id[0]] * GP.w_ms[self.id[0]] + 1 / (GP.cpu / GP.psi_ms[self.id[0]] - 1)
+        one_process_time_max = 2*process_time_max/(GP.lamda_ms[self.id[0]]+1)
+        process_time_min = self.lamda * GP.w_ms[self.id[0]] / GP.ypi_max + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
+        one_process_time_min = 2*process_time_min/(self.lamda + 1)
         #log.logger.debug('one_msg_time = %f' % (one_msg_time))
         while True:
             index += 1
@@ -44,6 +47,8 @@ class NF:
             del self.reqs[0]
             #process_time = self.lamda * GP.w_ms[self.id[0]] / self.n_threads + 1/(GP.cpu/GP.psi_ms[self.id[0]]-1)
             process_time = index * one_msg_time
+            process_time_max = index * one_process_time_max
+            process_time_min = index * one_process_time_min
             running_time += one_msg_time
             self.lamda -= 1
             if running_time > GP.one_step_time:
@@ -52,7 +57,7 @@ class NF:
                 self.reqs.insert(0, req)
                 break
             else:
-                self.processed_reqs.append(req + [process_time, process_time_max])
+                self.processed_reqs.append(req + [process_time, process_time_max, process_time_min])
             #log.logger.debug('inst(%d-%d) has processed req(%d-%d-%d) for %f' % (self.id[0], self.id[1], req[0], req[1], self.id[0], running_time))
         #self.old_lamda = self.lamda
         #self.old_n_threads = self.n_threads
@@ -108,6 +113,7 @@ class ENV:
         self.left_reqs += action.value
         #log.logger.debug('env running to process %d reqs' % (len(self.left_reqs)))
         obs_env = copy.deepcopy(self.obs)
+        del_index_ele = []
         for req in action.value:
             is_req_mapped_success = True
             last_obs_env_req = copy.deepcopy(obs_env)
@@ -130,8 +136,10 @@ class ENV:
                     obs_env = copy.deepcopy(last_obs_env)
             if is_req_mapped_success is False:
                 RV.mapped_succ_rate[-1] += 1
+                del_index_ele.append(req)
                 obs_env = copy.deepcopy(last_obs_env_req)
-
+        for req in del_index_ele:
+            self.left_reqs.remove(req) # un mapped reqs, removing...
         RV.mapped_succ_rate[-1] = (1 - RV.mapped_succ_rate[-1]/len(action.value))
 
         for m in range(len(GP.c_r_ms)):
@@ -145,19 +153,21 @@ class ENV:
         for r in range(len(self.left_reqs)):
             sum = 0
             sum_max = 0
+            sum_min = 0
             is_processed = True
             processed_remov_ele = []
             for act in self.left_reqs[r]:
                 is_here = False
                 [m,s,i,n,req_type, req_id] = act
                 #log.logger.debug('searching req(%d-%d) in instance(%d-%d)' % (req_type, req_id, m, s*GP.n_ms_server+i))
-                for [r_t, r_i, time, time_max] in self.nfs[m][s*GP.n_ms_server+i].processed_reqs:
+                for [r_t, r_i, time, time_max, time_min] in self.nfs[m][s*GP.n_ms_server+i].processed_reqs:
                     if r_t == req_type and r_i == req_id:
                         #log.logger.debug('inst(%d-%d) proposed reqs: %s' % (m, s * GP.n_ms_server + i, str([r_t, r_i])))
                         sum += time
                         sum_max += time_max
+                        sum_min += time_min
                         #self.nfs[m][s*GP.n_ms_server+i].processed_reqs.remove([r_t, r_i, time, time_max])
-                        processed_remov_ele.append([m,s,i, r_t, r_i, time, time_max])
+                        processed_remov_ele.append([m,s,i, r_t, r_i, time, time_max, time_min])
                         is_here = True
                         #log.logger.debug('found len(self.nfs.processed_reqs)=%d in instance(%d-%d)' % (len(self.nfs[m][s*GP.n_ms_server+i].processed_reqs), m, s*GP.n_ms_server+i))
                         break
@@ -170,12 +180,12 @@ class ENV:
                 #break
                 pass
             else:
-                for [m,s,i, r_t, r_i, time, time_max] in processed_remov_ele:
-                    self.nfs[m][s*GP.n_ms_server+i].processed_reqs.remove([r_t, r_i, time, time_max])
+                for [m,s,i, r_t, r_i, time, time_max, time_min] in processed_remov_ele:
+                    self.nfs[m][s*GP.n_ms_server+i].processed_reqs.remove([r_t, r_i, time, time_max, time_min])
                 index += 1
                 del_index_ele.append(self.left_reqs[r])
                 #log.logger.debug('searching req(%d-%d) successfully' % (req_type, req_id))
-                Q_t += (1 - sum/sum_max)
+                Q_t += (sum_max - sum)/(sum_max - sum_min)
         if len(self.left_reqs) == 0:
             Q_t = 0
         else:
@@ -195,10 +205,11 @@ class ENV:
         log.logger.debug('detailed-reward: succ_rate=%f, Q_t=%f, total_req=%d, resource_rate=%f' % (RV.mapped_succ_rate[-1], Q_t, len(action.value), resource_rate))
         #log.logger.debug('time step major reward = %f' % (major_reward))
         #major_reward = major_reward * GP.beta_r + GP.beta_r
-        major_reward = (resource_rate * 5 + 10)
-        major_reward += (Q_t * 5 + 15)
-        major_reward += (RV.mapped_succ_rate[-1] * 5 + 5)
-        log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % ((resource_rate * 5 + 10), (Q_t * 5 + 15), (RV.mapped_succ_rate[-1] * 5 + 5), major_reward))
+        #major_reward = (resource_rate * 10 + 10)
+        #major_reward = (Q_t * 10)
+        major_reward = (RV.mapped_succ_rate[-1] * 50)
+        #major_reward /= (10+20)
+        log.logger.debug('(scale) time step major reward: %f+%f+%f = %f' % (0, (Q_t * 10), (RV.mapped_succ_rate[-1] * 50), major_reward))
         #major_reward = math.exp(2*Q_t) + 20
         #major_reward += math.exp(resource_rate) + 10
         #major_reward += (2 - math.exp(-2*action.n_mapped_succ_rate)) + 30
@@ -207,7 +218,7 @@ class ENV:
         RV.episode_reward[-1] += major_reward
 
         for req in del_index_ele:
-            self.left_reqs.remove(req)
+            self.left_reqs.remove(req) # successfully processed reqs, removing...
 
         deleted_reqs = del_index_ele
         for req in deleted_reqs:

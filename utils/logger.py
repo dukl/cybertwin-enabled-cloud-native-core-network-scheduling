@@ -31,9 +31,13 @@ class Logger(object):
         self.logger.addHandler(sh) #把对象加到logger里
         self.logger.addHandler(th)
 
-logDebug = 'logs/debug.log'
+logDebug = '../logs/debug.log'
 os.remove(logDebug)
 log = Logger(logDebug, level='debug')
+
+logData = '../logs/data.log'
+os.remove(logData)
+log_d = Logger(logData, level='debug')
 
 
 #if __name__ == '__main__':
