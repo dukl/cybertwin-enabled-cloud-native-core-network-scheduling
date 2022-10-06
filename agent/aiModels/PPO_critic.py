@@ -12,12 +12,13 @@ class CPPO:
         self.lyers = layers
 
         self.tfs = tf.placeholder(tf.float32, [None, self.obs_dim], 'cstate')
-        w_init = tf.random_normal_initializer(0., .1)
+        #w_init = tf.random_normal_initializer(0., .1)
+        lc = None
         for i, layer in enumerate(self.lyers):
             if i == 0:
-                lc = tf.layers.dense(self.tfs, layer, tf.nn.relu, kernel_initializer=w_init, name='lc'+str(i))
+                lc = tf.layers.dense(self.tfs, layer, tf.nn.relu, name='lc'+str(i))
             else:
-                lc = tf.layers.dense(lc, layer, tf.nn.relu, kernel_initializer=w_init, name='lc'+str(i))
+                lc = tf.layers.dense(lc, layer, tf.nn.relu, name='lc'+str(i))
         self.v = tf.layers.dense(lc, 1)
         self.tfdc_r = tf.placeholder(tf.float32, [None, 1], 'dicounted_r')
         self.advantage = self.tfdc_r - self.v
@@ -26,4 +27,5 @@ class CPPO:
 
     def get_v(self, s):
         if s.ndim < 2: s = s[np.newaxis, :]
-        return self.sess.run(self.v, {self.tfs: s})[0, 0]
+        value = self.sess.run(self.v, {self.tfs: s})[0, 0]
+        return value

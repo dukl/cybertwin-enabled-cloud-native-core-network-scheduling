@@ -29,17 +29,19 @@ class VALUE:
         self.actor_node_select = 0
         self.action_src_nf_select = 0
         self.action_dst_nf_select = 0
+        self.punish_reward = 0
         #self.action_scale_up_dn = []
+
     def get_list_value(self):
         return [self.n_episode, self.n_ts, self.total_reqs, self.n_succ_reqs, self.n_fail_reqs, self.qos_throughput,
                 self.average_delay, self.qos_delay, self.qos, self.qos_weight, self.res_mean, self.res_var, self.res_distribution, self.res, self.res_weight, self.time_step_reward, self.episode_reward,
-                self.action_ops, self.action_nf_select, self.actor_node_select, self.action_src_nf_select, self.action_dst_nf_select]
+                self.action_ops, self.action_nf_select, self.actor_node_select, self.action_src_nf_select, self.action_dst_nf_select, self.punish_reward]
 
 class METRICS:
     def __init__(self):
-        self.excel_path = '../results/metrics-' +str(now_time.year) + '-' + str(now_time.month) + '-' + str(now_time.day) + '-' + str(now_time.hour) +'-' + str(now_time.minute)
+        self.excel_path = '../results/metrics-' +str(now_time.year) + '-' + str(now_time.month) + '-' + str(now_time.day) + '-' + str(now_time.hour) +'-' + str(now_time.minute) + '/'
         self.title = ['episode', 'time_step', 'total_reqs', 'n_succ', 'n_fail', 'QoS_throughput','aver_delay','QoS_delay','QoS','QoS_weight','Res_mean','Res_var','Res_distri','Res','Res_weight',
-                      'time_step_reward','episode_reward','action_ops', 'action_nf_select', 'actor_node_select', 'action_src_nf_select', 'action_dst_nf_select']
+                      'time_step_reward','episode_reward','action_ops', 'action_nf_select', 'actor_node_select', 'action_src_nf_select', 'action_dst_nf_select', 'punish_reward']
         self.book = None
         self.sheet = None
         self.rows = 0
@@ -52,7 +54,7 @@ class METRICS:
     #            self.res_var, self.res_distribution, self.res, self.res_weight, self.time_step_reward, self.episode_reward]
 
     def write_to_xlsx_episode(self):
-        if not os.path.exists(self.excel_path+'-episode.xls'):
+        if not os.path.exists(self.excel_path+'episode.xls'):
             print('create a new file')
             book = xlwt.Workbook()
             sheet = book.add_sheet('episode_reward')
@@ -64,22 +66,24 @@ class METRICS:
                 for j, value in enumerate(self.episode_reward[i]):
                     sheet.write(id_row, j, value)
                 id_row += 1
-            book.save(self.excel_path+'-episode.xls')
+            book.save(self.excel_path+'episode.xls')
 
-    def write_to_xlsx_time_step(self):
-        if not os.path.exists(self.excel_path+'-time_step.xls'):
-            print('new excel file')
-            book = xlwt.Workbook() # create excel
+    def write_to_xlsx_time_step(self, ep):
+        if not os.path.exists(self.excel_path):
+            os.mkdir(self.excel_path)
+        file_name = self.excel_path + 'episode-' + str(ep) + '.xls'
+        if not os.path.exists(file_name):
+            book = xlwt.Workbook()  # create excel
             sheet = book.add_sheet('metrics')  # create a sheet named 'metrics'
-            for i, t in enumerate(self.title):
-                sheet.write(0, i, t)
+            for j, t in enumerate(self.title):
+                sheet.write(0, j, t)
             rows = 1
             for i in range(len(self.value)):
                 list_value = self.value[i].get_list_value()
-                for j, value in enumerate(list_value):
-                    sheet.write(rows, j, value)
+                for idx, value in enumerate(list_value):
+                    sheet.write(rows, idx, value)
                 rows += 1
-            book.save(self.excel_path+'-time_step.xls')
+        book.save(file_name)
         #else:
         #    print('old excel file')
         #    self.book = xlrd.open_workbook(self.excel_path)

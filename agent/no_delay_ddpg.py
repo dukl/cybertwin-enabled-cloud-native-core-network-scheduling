@@ -16,6 +16,7 @@ class NDDDPG:
         self.req_index = [0 for _ in range(len(GP.msc))]
         self.pending_obs, self.pending_act = None, None
         self.step_num = 0
+        self.train_index = 0
 
     def reset(self):
         self.reqs = [0 for _ in range(len(GP.msc))]
@@ -26,7 +27,7 @@ class NDDDPG:
     def receive_requests(self):
         self.reqs = [0 for _ in range(len(GP.msc))]
         for i in range(len(GP.msc)):
-            self.reqs[i] = random.randint(0,GP.n_reqs_per_msc)
+            self.reqs[i] = GP.n_reqs_per_msc #random.randint(0,GP.n_reqs_per_msc)
             self.req_index[i] += self.reqs[i]
         return self.reqs
 
@@ -49,7 +50,7 @@ class NDDDPG:
         obs_input[obs_input==0] = 0.0001
         #log.logger.debug('agent receive observation (normnized) = (len=%d)\n%s' % (len(obs_input.tolist()),str(obs_input.tolist())))
         action_value = self.ddpg.act(obs_input)[0]
-        action_out   = action_value.reshape(1, self.act_dim)
+        #action_out   = action_value.reshape(1, self.act_dim)
         action_value = (action_value - numpy.min(action_value))/(numpy.max(action_value) - numpy.min(action_value)) * GP.n_servers*GP.n_ms_server*GP.ypi_max
         action_value = action_value.astype('int')
         #log.logger.debug('action = (len = %d)\n%s' % (len(action_value.tolist()), str(action_value.tolist())))
@@ -69,13 +70,14 @@ class NDDDPG:
                 valid_action.append(inter_actions)
         if self.pending_obs is not None:
             self.ddpg.memory.append([self.pending_obs, self.pending_act, obs[0].major_reward, obs_input.reshape(1, obs_input.shape[0])])
-        self.pending_obs, self.pending_act = obs_input.reshape(1, obs_input.shape[0]), action_out
+        self.pending_obs, self.pending_act = obs_input.reshape(1, obs_input.shape[0]), action_value.reshape(1, action_value.shape[0])
         self.step_num += 1
         batch_size = 32
-        if len(self.ddpg.memory) > batch_size and self.step_num % 100 == 0:
-            log.logger.debug('Replacing...')
-            self.ddpg.update_target()
-        if len(self.ddpg.memory) > batch_size and self.step_num % 10 == 0:
+        if len(self.ddpg.memory) > batch_size and self.step_num % 20 == 0:
+            self.train_index += 1
+            if self.train_index % 20 == 0:
+                log.logger.debug('Replacing...')
+                self.ddpg.update_target()
             log.logger.debug('Training...')
             self.ddpg.train(batch_size)
         return ACT(ts, valid_action)

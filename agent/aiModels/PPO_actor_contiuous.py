@@ -26,11 +26,11 @@ class APPO_C:
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'ac_advantage_'+str(self.id))
         with tf.variable_scope('loss_'+str(self.id)):
             with tf.variable_scope('surrogate_'+str(self.id)):
-                ratio = self.pi.prob(self.tfa) / (self.oldpi.prob(self.tfa) + 1e-5)
-                surr = ratio * self.tfadv
+                self.ratio = self.pi.prob(self.tfa) / (self.oldpi.prob(self.tfa) + 1e-5)
+                surr = self.ratio * self.tfadv
             self.aloss = -tf.reduce_mean(tf.minimum(
                 surr,
-                tf.clip_by_value(ratio, 1. - self.epsilon, 1. + self.epsilon) * self.tfadv
+                tf.clip_by_value(self.ratio, 1. - self.epsilon, 1. + self.epsilon) * self.tfadv
             ))
         with tf.variable_scope('atrain_'+str(self.id)):
             self.atrain_op = tf.train.AdamOptimizer(self.lr).minimize(self.aloss)
@@ -52,5 +52,8 @@ class APPO_C:
     def choose_action(self, s):
         s = s[np.newaxis, :]
         a = self.sess.run(self.sample_op, {self.tfs: s})[0]
-        return np.clip(a, 0.001, 1)
+        print('action_out_con_before ', a.tolist())
+        a = (np.max(a) - a) / (np.max(a) - np.min(a))
+        #print('action_out_con ', a.tolist())
+        return a
 

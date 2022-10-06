@@ -20,14 +20,14 @@ class APPO_D:
         self.tfa = tf.placeholder(tf.int32, [None, ],  'ad_action_'+str(self.id))
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'ad_advantage_'+str(self.id))
         self.a_indices = tf.stack([tf.range(tf.shape(self.tfa)[0], dtype=tf.int32), self.tfa], axis=1)
-        pi_prob = tf.gather_nd(params=self.pi, indices=self.a_indices)
-        oldpi_prob = tf.gather_nd(params=self.oldpi, indices=self.a_indices)
-        ratio = pi_prob/(oldpi_prob + 1e-5)
-        surr = ratio * self.tfadv
+        self.pi_prob = tf.gather_nd(params=self.pi, indices=self.a_indices)
+        self.oldpi_prob = tf.gather_nd(params=self.oldpi, indices=self.a_indices)
+        self.ratio = self.pi_prob/(self.oldpi_prob + 1e-5)
+        surr = self.ratio * self.tfadv
 
         self.aloss = -tf.reduce_mean(tf.minimum(
             surr,
-            tf.clip_by_value(ratio, 1. - self.epsilon, 1. + self.epsilon) * self.tfadv
+            tf.clip_by_value(self.ratio, 1. - self.epsilon, 1. + self.epsilon) * self.tfadv
         ))
         self.atrain_op = tf.train.AdamOptimizer(self.lr).minimize(self.aloss)
 
@@ -44,6 +44,7 @@ class APPO_D:
 
     def choose_action(self, s):
         prob_weights = self.sess.run(self.pi, feed_dict={self.tfs: s[None, :]})
+        print('action_out ', prob_weights.tolist())
         action = np.random.choice(range(prob_weights.shape[1]),
                                   p=prob_weights.ravel())
         return action

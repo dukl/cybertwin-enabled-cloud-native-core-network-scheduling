@@ -26,7 +26,7 @@ computing_demand = [
     [4, 99, 100, 200]
 ]
 
-flow_ttl = [100, 100, 100, 100, 100, 100, 100, 100, 100]
+flow_ttl = [150, 150, 150, 150, 150, 150, 150, 150, 150]
 
 msg_msc = [
     [0,1,2,4,5,7,8],
@@ -50,7 +50,7 @@ procedure = [#index in msg_msc
 
 arrival_dist = ['Poisson'] # 'Trace'
 
-n_max_inst = 5
+n_max_inst = 10
 
 n_node = 8
 
@@ -62,13 +62,13 @@ n_max_load = 200
 n_msgs_one_round = 20
 
 actors = [
-    [3, True, 0.001, [64, 64]],
-    [len(t_NFs)-1, True, 0.001, [128, 128]],
-    [n_node, True, 0.001, [128, 128]],
-    [n_max_inst, False, 0.001, [128, 128]],
-    [len(t_NFs)-1, True, 0.001, [128, 128]],
-    [len(t_NFs)-1, True, 0.001, [128, 128]],
-    [n_max_inst*n_max_inst, False, 0.001, [256, 256]]
+    [3, True, 0.001, [1024, 1024, 1024]],
+    [len(t_NFs)-1, True, 0.001, [1024, 1024, 1024]],
+    [n_node, True, 0.001, [2048, 2048, 2048]],
+    [n_max_inst, False, 0.001, [1024, 1024, 1024]],
+    [len(t_NFs)-1, True, 0.001, [1024, 1024, 1024]],
+    [len(t_NFs)-1, True, 0.001, [1024, 1024, 1024]],
+    [n_max_inst*n_max_inst, False, 0.001, [2048, 2048, 2048]]
 ]
 
 critic = [0.001, [128, 128]]

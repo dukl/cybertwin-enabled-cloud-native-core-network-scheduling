@@ -1,5 +1,6 @@
 import random
 
+import numpy
 import numpy as np
 
 import utils.global_parameters as GP
@@ -53,8 +54,8 @@ class DDPG:
         self.sess = tf.Session()
         self.epsilon = 0.9
         self.gamma   = 0.99
-        self.epsilon_decay = 0.99995
-        self.tau     = 0.01
+        self.epsilon_decay = 0.9995
+        self.tau     = 0.001
         self.memory  = deque(maxlen=400000)
         self.update_ite = 0
         self.obs_dim = obs_dim
@@ -66,15 +67,15 @@ class DDPG:
         actor_model_weights    = self.actor_model.trainable_weights
         self.actor_grads = tf.gradients(self.actor_model.output, actor_model_weights, -self.actor_critic_grad)
         grads = zip(self.actor_grads, actor_model_weights)
-        self.optimize = tf.train.AdamOptimizer(0.01).apply_gradients(grads)
+        self.optimize = tf.train.AdamOptimizer(0.001).apply_gradients(grads)
 
         self.critic_state_input, self.critic_action_input, self.critic_model = self.create_critic_model()
         _, _, self.target_critic_model = self.create_critic_model()
         self.critic_grads = tf.gradients(self.critic_model.output, self.critic_action_input)
 
-        self.update_target()
-
         self.sess.run(tf.global_variables_initializer())
+
+        self.update_target()
 
         self.pending_s = None
         self.pending_a = None
@@ -112,9 +113,14 @@ class DDPG:
         #log.logger.debug('[line-24][generate action value to be executed]')
         self.epsilon *= self.epsilon_decay
         if np.random.random() < self.epsilon:
-            noise = Ornstein_Uhlenbeck_Noise(sigma=1,mu=np.zeros(1))
-            log.logger.debug('noise = %s' % (str(noise())))
-            return self.actor_model.predict(state) + noise()[0]
+            action = self.actor_model.predict(state)
+            #log.logger.debug('%s' % (str(action.tolist())))
+            noise = []
+            for i in range(action.shape[1]):
+                tmp = Ornstein_Uhlenbeck_Noise(sigma=5, mu=np.zeros(1))
+                noise.append(tmp()[0])
+            #log.logger.debug('noise = \n %s' % (str(noise)))
+            return action + numpy.array(noise)
         return self.actor_model.predict(state)
 
     def remember(self, s, a, r):
@@ -133,15 +139,27 @@ class DDPG:
     def train_critic(self, samples):
         log.logger.debug('[Training critic]')
         s_ts, actions, rewards, s_ts1 = stack_samples(samples)
+        #log.logger.debug('s_t = \n%s' % (str(s_ts[0].tolist())))
+        #log.logger.debug('s_t+1 = \n%s' % (str(s_ts1[0].tolist())))
+        #log.logger.debug('actions = \n%s' % (str(actions.tolist())))
         target_actions = self.target_actor_model.predict(s_ts1)
-        future_rewards = self.target_critic_model.predict([s_ts, target_actions])
+        target_actions = (target_actions - numpy.min(target_actions)) / (numpy.max(target_actions) - numpy.min(target_actions)) * GP.n_servers * GP.n_ms_server * GP.ypi_max
+        target_actions = target_actions.astype('int')
+        #log.logger.debug('target_actions = \n %s' % (str(target_actions.tolist())))
+        future_rewards = self.target_critic_model.predict([s_ts1, target_actions])
+        #log.logger.debug('train_critic, future_rewards = \n%s' % (str(future_rewards.tolist())))
+        #log.logger.debug('reward = \n%s' % (str(rewards.tolist())))
         rewards += self.gamma*future_rewards
-        self.critic_model.fit([s_ts, actions], rewards, verbose=0)
+        train_history = self.critic_model.fit([s_ts, actions], rewards, verbose=0)
+        q_loss = train_history.history['loss'][0]
+        log.logger.debug('Q_loss = %s' % (str(q_loss)))
 
     def train_actor(self, samples):
         log.logger.debug('[Training actor]')
         s_ts, _, _, _ = stack_samples(samples)
         predicted_actions = self.actor_model.predict(s_ts)
+        predicted_actions = (predicted_actions - numpy.min(predicted_actions)) / (numpy.max(predicted_actions) - numpy.min(predicted_actions)) * GP.n_servers * GP.n_ms_server * GP.ypi_max
+        predicted_actions = predicted_actions.astype('int')
         grads = self.sess.run(self.critic_grads, feed_dict={
             self.critic_state_input: s_ts,
             self.critic_action_input: predicted_actions
