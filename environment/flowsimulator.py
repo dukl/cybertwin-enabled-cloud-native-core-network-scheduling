@@ -1,3 +1,5 @@
+import numpy as np
+
 from utils.logger import log
 import utils.auto_scaling_settings as ACS
 import random
@@ -12,6 +14,7 @@ class FLOW:
         self.creation_time = creation_time
         self.in_msg_on_road_time = 0
         self.nf_inst_id = 0
+        self.node_chain = []
 
 class UE:
     def __init__(self, ue_id):
@@ -26,6 +29,8 @@ class FlowSimulator:
         self.env_nfs = params.nfs
         self.params = params
         self.ues = [None for _ in range(ACS.n_max_ues)]
+        self.scheduling_table = np.ones((len(ACS.msg_msc)*(len(ACS.t_NFs)-1), ACS.n_node))
+        self.index = np.zeros((len(ACS.msg_msc), (len(ACS.t_NFs) - 1)))
 
     def start(self):
         ##log.logger.debug('Starting simulation')
@@ -85,10 +90,23 @@ class FlowSimulator:
 
     def init_arrival(self, nf_id):
         avai_rise = self.g_env.check_available_instance_by_nf_id(nf_id)
+        tmp = np.sum(self.scheduling_table, 1).reshape(-1,1)
+        self.scheduling_table = (self.scheduling_table / tmp * 10).astype('int32')
+
         while True:
             metrics.value[-1].total_reqs += 1
             flow = self.generate_flow(nf_id)
             ###log.logger.debug('new flow generated - %f' % (self.env.now))
+            for nf in ACS.msg_msc[flow.msg_id]:
+                if nf == 0:
+                    continue
+                self.index[flow.msg_id][nf - 1] = (self.index[flow.msg_id][nf - 1] + 1) % (self.scheduling_table[flow.msg_id*(len(ACS.t_NFs)-1)+nf-1])
+                sum = 0
+                for i in range(ACS.n_node):
+                    sum += self.scheduling_table[flow.msg_id*(len(ACS.t_NFs)-1)+nf-1]
+                    if self.index[flow.msg_id][nf - 1] <= sum:
+                        flow.node_chain.append(i)
+                        break
             rise_id = random.randint(0, len(avai_rise)-1)
             yield avai_rise[rise_id].message_queue.put(flow)
             ##log.logger.debug('generate flow-%d-%d-%d-%d: time = %f' % (flow.ue_id, flow.pro_id, flow.msg_id, flow.index, self.env.now))

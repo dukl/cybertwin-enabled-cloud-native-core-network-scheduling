@@ -9,8 +9,9 @@ from environment.flowsimulator import FlowSimulator
 from utils.actions_definition import ACTIONS
 from results.metrics import metrics, VALUE
 from agent.tree_structure_agent_no_delay import TSAND
+from agent.hybrid_agent_d_c import HADC
 
-EP_MAX, EP_LEN, BATCH, GAMMA = 1000, 200, 200, 0.9
+EP_MAX, EP_LEN, BATCH, GAMMA = 1, 200, 200, 0.9
 TIME_PER_STEP = 100
 
 
@@ -30,12 +31,15 @@ class NODE:
         self.remaining_resource = 0 # [CPU, ...]
         self.maximum_resource = 8000
         self.nfs = [[] for _ in range(len(ACS.t_NFs))] # how many instances for each service
+        #self.scheduling_table = np.zeros(len(ACS.msg_msc), len(ACS.t_NFs) - 1)
 
-    def get_remain_resources(self, nf_id):
+    def get_remain_resources(self, nf_id, inst_id):
         sum = 0
         for nf in self.nfs:
             for inst in nf:
-                if inst.is_alive == False or inst.id == nf_id:
+                if inst.is_alive == False:
+                    continue
+                if inst.id == nf_id and inst.inst_id == inst_id:
                     continue
                 sum += inst.allocated_resource
         return self.maximum_resource - sum
@@ -64,6 +68,17 @@ class NF:
         self.is_alive_event = self.sim_env.event()
         self.is_alive = False
         self.scheduling_table = [[] for _ in range(len(ACS.t_NFs))]
+
+    def determize_next_nf_inst_new(self, nnf_id, flow):
+        nnf_loc_id = flow.node_chain[flow.index - 1]
+        avai_inst = self.env.check_node_nf_insts(nnf_loc_id, nnf_id)
+        min_ratio = 1000
+        ret_inst = None
+        for i, inst in enumerate(avai_inst):
+            if len(inst.message_queue.items) / inst.allocated_resource < min_ratio:
+                min_ratio = len(inst.message_queue.items) / inst.allocated_resource
+                ret_inst = inst
+        return ret_inst
 
     def determize_next_nf_inst(self, next_nf_id):
         next_nf_inst_idx, n_sum = 0, 0
@@ -104,7 +119,7 @@ class NF:
             src_nf_inst_loc = self.loc_id
             next_nf = ACS.msg_msc[flow.msg_id][flow.index]
 
-            next_nf_inst = self.determize_next_nf_inst(next_nf)
+            next_nf_inst = self.determize_next_nf_inst_new(next_nf, flow)
             if next_nf_inst is None:
                 continue
 
@@ -256,6 +271,61 @@ class ENV_SIMPY:
                 yield same_nf[index].message_queue.put(flow)
                 index = (index + 1) % len(same_nf)
 
+    def check_node_nf_insts(self, loc_id, nf_id):
+        avai_insts = []
+        for inst in self.nodes[loc_id].nfs[nf_id]:
+            if inst.is_alive == True:
+                avai_insts.append(inst)
+        return avai_insts
+
+    def execute_new_action(self, action, simulator):
+        for i in range(ACS.n_node):
+            for j in range(len(ACS.t_NFs)-1):
+                avai_insts = self.check_available_instance_by_nf_id(j+1)
+                unavai_insts = self.check_available_instances(i, j+1)
+                n_inst = ACS.n_max_inst - len(unavai_insts)
+                if action.h_s[i*(len(ACS.t_NFs)-1) + j] - 1 == -1:
+                    if len(avai_insts) == 1:
+                        log.logger.debug('at least one instance')
+                    elif n_inst - 1 < 0:
+                        log.logger.debug('no active instance')
+                        pass
+                    else:
+                        log.logger.debug('close this instance')
+                        nf_instances = list(set(self.nodes[i].nfs[j+1]) - set(unavai_insts))
+                        nf_instances.sort(key=lambda NF: len(NF.message_queue.items), reverse=False)
+                        ##log.logger.debug('deleting an instance nf-%d-%d-%d' % (nf_instances[0].loc_id, nf_instances[0].id, nf_instances[0].inst_id))
+                        nf_instances[0].is_alive = False
+                        nf_instances[0].is_alive_event = self.sim_env.event()
+                        nf_instances[0].allocated_resource = 100
+                        avai_insts = self.check_available_instance_by_nf_id(nf_instances[0].id)
+                        self.sim_env.process(self.moving_flows(nf_instances[0], avai_insts))
+                if action.h_s[i * (len(ACS.t_NFs) - 1) + j] - 1 == 0:
+                    log.logger.debug('maintain')
+                    pass
+                if action.h_s[i * (len(ACS.t_NFs) - 1) + j] - 1 == 1:
+                    log.logger.debug('add one instance')
+                    pass
+                if n_inst + 1 > ACS.n_max_inst:
+                    log.logger.debug('exceed maximum instance at this node')
+                else:
+                    idx = random.randint(0, len(unavai_insts) - 1)
+                    unavai_insts[idx].is_alive = True
+                    unavai_insts[idx].is_alive_event.succeed()
+                nf_instances = list(set(self.nodes[i].nfs[j + 1]) - set(unavai_insts))
+                for n, inst in enumerate(nf_instances):
+                    node_res_remain = self.nodes[inst.loc_id].get_remain_resources(inst.id, inst.inst_id)
+                    if inst.allocated_resource * (1 + action.v_s[i*(len(ACS.t_NFs)-1) + j][n]) > node_res_remain:
+                        log.logger.debug('exceed maximum resources for node-%d' % (inst.loc_id))
+                        continue
+                    if inst.allocated_resource * (1 + action.v_s[i * (len(ACS.t_NFs) - 1) + j][n]) < 100:
+                        continue
+                    inst.allocated_resource = inst.allocated_resource * (1 + action.v_s[i * (len(ACS.t_NFs) - 1) + j][n])
+        simulator.scheduling_table = action.sch
+        #tmp = np.sum(action.sch, 1).reshape(-1, 1)
+        simulator.scheduling_table = (simulator.scheduling_table * 10).astype('int32')
+        simulator.index = np.zeros((len(ACS.msg_msc), (len(ACS.t_NFs) - 1)))
+
     def execute_action(self, action):
         nf_id = action.scale_nf_idx
         loc_id = action.scale_in_out_node_idx
@@ -278,6 +348,13 @@ class ENV_SIMPY:
                     #self.nodes[loc_id].nfs[nf_id][unavai_insts[idx].inst_id].is_alive_event.succeed()
                     self.add_new_inst(unavai_insts[idx])
                     ##log.logger.debug('added nf-%d-%d-%d' % (unavai_insts[idx].loc_id,unavai_insts[idx].id, unavai_insts[idx].inst_id))
+            vertical_scaling = action.scale_up_dn
+            for i, inst in enumerate(avai_insts):
+                node_res_remain = self.nodes[inst.loc_id].get_remain_resources(inst.id, inst.inst_id)
+                if inst.allocated_resource*(1+vertical_scaling[i]) > node_res_remain:
+                    log.logger.debug('exceed maximum resources for node-%d' % (inst.loc_id))
+                    continue
+                inst.allocated_resource = inst.allocated_resource * (1+vertical_scaling[i])
         if action.scale_in_out_idx == 0:
             ##log.logger.debug('scaling decision: nf-%d: maintaining ... scale in/out' % (nf_id))
             pass
@@ -299,17 +376,13 @@ class ENV_SIMPY:
                     nf_instances.sort(key=lambda NF:len(NF.message_queue.items), reverse=False)
                     ##log.logger.debug('deleting an instance nf-%d-%d-%d' % (nf_instances[0].loc_id, nf_instances[0].id, nf_instances[0].inst_id))
                     self.delete_one_inst(nf_instances[0])
-        avai_insts = self.check_available_instance_by_nf_id(nf_id)
-        #vertical_scaling = numpy.array(action.scale_up_dn).reshape((ACS.n_node, ACS.n_max_inst)).astype('float')
-        vertical_scaling = action.scale_up_dn
-        for i, inst in enumerate(avai_insts):
-            node_res_remain = self.nodes[inst.loc_id].get_remain_resources(inst.id)
-            #log.logger.debug('node-%d remains %f resource for nf-%d; %f' % (inst.loc_id, node_res_remain, inst.id, vertical_scaling[i]))
-            inst.allocated_resource = node_res_remain*(vertical_scaling[i])
-            if inst.allocated_resource < 100: # minimum resource for nf
-                log.logger.debug('lower than minimum resource of nf-%d-%d-%d, punish' % (inst.loc_id, inst.id, inst.inst_id))
-                metrics.value[-1].punish_reward += 1
-                inst.allocated_resource = 100
+            vertical_scaling = action.scale_up_dn
+            for i, inst in enumerate(avai_insts):
+                if inst.allocated_resource * (1-vertical_scaling[i]) < 100:
+                    log.logger.debug('lower than minimum resource of nf-%d-%d-%d, punish' % (inst.loc_id, inst.id, inst.inst_id))
+                    continue
+                inst.allocated_resource = inst.allocated_resource * (1 - vertical_scaling[i])
+
         schduling_table = numpy.array(action.scheduling).reshape((ACS.n_max_inst, ACS.n_max_inst)).astype('float')
         src_insts = self.check_available_instance_by_nf_id(action.scheduling_src_nf_idx)
         dst_insts = self.check_available_instance_by_nf_id(action.scheduling_dst_nf_idx)
@@ -449,8 +522,8 @@ class ENV_SIMPY:
         metrics.value[-1].qos_weight = 1
         metrics.value[-1].res_weight = 1
 
-        metrics.value[-1].time_step_reward = metrics.value[-1].qos_weight * metrics.value[-1].qos + metrics.value[-1].res_weight * metrics.value[-1].res + 5 - metrics.value[-1].punish_reward
-        #metrics.value[-1].time_step_reward = metrics.value[-1].qos_weight * metrics.value[-1].qos + metrics.value[-1].res_weight * metrics.value[-1].res
+        #metrics.value[-1].time_step_reward = metrics.value[-1].qos_weight * metrics.value[-1].qos + metrics.value[-1].res_weight * metrics.value[-1].res + 5 - metrics.value[-1].punish_reward
+        metrics.value[-1].time_step_reward = metrics.value[-1].qos_weight * metrics.value[-1].qos + metrics.value[-1].res_weight * metrics.value[-1].res
         #log.logger.debug('qos_tp=%f, qos_delay=%f, res_mean=%f, res_var=%f, res_dist=%f, reward=%f' % (metrics.value[-1].qos_throughput, metrics.value[-1].qos_delay,metrics.value[-1].res_mean,metrics.value[-1].res_var,metrics.value[-1].res_distribution,metrics.value[-1].time_step_reward))
         return metrics.value[-1].time_step_reward
 
@@ -475,7 +548,7 @@ def test_action():
 
 def run_no_delay_scenario(n_ep):
     metrics.episode_reward.clear()
-    agent = TSAND()
+    agent = HADC()#TSAND()
     for ep in range(n_ep):
         metrics.episode_reward.append([0, 0])
         log.logger.debug('episode %d\n\n\n' % (ep))
@@ -509,14 +582,15 @@ def run_no_delay_scenario(n_ep):
 
 
 
-            if sum(action.scale_up_dn) > 0:
-                action.scale_up_dn = [a / sum(action.scale_up_dn) for a in action.scale_up_dn]
+            #if sum(action.scale_up_dn) > 0:
+            #    action.scale_up_dn = [a / sum(action.scale_up_dn) for a in action.scale_up_dn]
             #print('action_vertical ', action.scale_up_dn)
 
-            log.logger.debug('action_scale_in_out_idx = %d' % (action.scale_in_out_idx))
-            log.logger.debug('action_scale_nf_idx = %d' % (action.scale_nf_idx))
+            #log.logger.debug('action_scale_in_out_idx = %d' % (action.scale_in_out_idx))
+            #log.logger.debug('action_scale_nf_idx = %d' % (action.scale_nf_idx))
 
-            env.execute_action(action)
+            #env.execute_action(action)
+            env.execute_new_action(action, simulator)
             simEnv.run(until=100 * (ts + 1))
 
             s_ = env.obtain_state(ep, ts + 1)
@@ -547,10 +621,10 @@ def run_no_delay_scenario(n_ep):
 
 def run_delayed_scenarios(n_ep, n_delay):
     metrics.episode_reward.clear()
-    metrics.value.clear()
     agent = TSAND()
     obs_on_road = []
     for ep in range(n_ep):
+        metrics.value.clear()
         metrics.episode_reward.append([0, 0])
         ##log.logger.debug('episode %d\n\n\n' % (ep))
         simEnv = simpy.Environment()

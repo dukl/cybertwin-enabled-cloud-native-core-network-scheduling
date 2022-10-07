@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 class APPO_D:
-    def __init__(self, id, sess, act_dim, obs_dim, lr=0.001, epsilon=0.2, layers=None):
+    def __init__(self, id, flag, sess, act_dim, obs_dim, lr=0.001, epsilon=0.2, layers=None):
         self.id = id
         self.sess = sess
         self.act_dim = act_dim
@@ -12,6 +12,7 @@ class APPO_D:
         self.lr = lr
         self.epsilon = epsilon
         self.layers = layers
+        self.is_dicrete = flag
 
         self.tfs = tf.placeholder(tf.float32, [None, self.obs_dim], 'ad_state_'+str(self.id))
         self.pi, self.pi_params = self._build_anet('ad_pi_'+str(self.id), trainable=True)
@@ -44,7 +45,7 @@ class APPO_D:
 
     def choose_action(self, s):
         prob_weights = self.sess.run(self.pi, feed_dict={self.tfs: s[None, :]})
-        print('action_out ', prob_weights.tolist())
+        #print('action_out ', prob_weights.tolist())
         action = np.random.choice(range(prob_weights.shape[1]),
                                   p=prob_weights.ravel())
         return action

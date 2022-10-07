@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 class APPO_C:
-    def __init__(self, id, sess, act_dim, obs_dim, lr=0.001, epsilon=0.2, layers=None):
+    def __init__(self, id, flag, sess, act_dim, obs_dim, lr=0.001, epsilon=0.2, layers=None):
         self.id = id
         self.sess = sess
         self.act_dim = act_dim
@@ -14,6 +14,7 @@ class APPO_C:
         self.lr = lr
         self.epsilon = epsilon
         self.layers = layers
+        self.is_dicrete = flag
 
         self.tfs = tf.placeholder(tf.float32, [None, self.obs_dim], 'ac_state_'+str(self.id))
         self.pi, self.pi_params = self._build_anet('ac_pi_'+str(self.id), trainable=True)
@@ -52,8 +53,8 @@ class APPO_C:
     def choose_action(self, s):
         s = s[np.newaxis, :]
         a = self.sess.run(self.sample_op, {self.tfs: s})[0]
-        print('action_out_con_before ', a.tolist())
-        a = (np.max(a) - a) / (np.max(a) - np.min(a))
+        #print('action_out_con_before ', a.tolist())
+        #a = (np.max(a) - a) / (np.max(a) - np.min(a))
         #print('action_out_con ', a.tolist())
         return a
 
