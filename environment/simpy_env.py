@@ -643,7 +643,7 @@ def run_delayed_scenarios(n_ep, n_delay):
         x_ = np.arange(0, 6.48, 0.01)
         sin_x = np.sin(x_) * 100 + 100
         episode_reward = 0
-        is_collect_obs = True
+        #is_collect_obs = True
         for ts in range(EP_LEN):
             if sin_x[ts + 2] < 1e-5:
                 params.inter_arr_mean = 100
@@ -663,15 +663,15 @@ def run_delayed_scenarios(n_ep, n_delay):
                 metrics.value[-1].episode_reward = episode_reward
                 log.logger.debug('episode-%d time_step-%d, reward = %f\n' % (ep, ts, reward))
                 #buffer_r.append(reward)
-            if is_collect_obs:
-                obs_on_road.append([ts, float(np.random.randint(n_delay - TIME_PER_STEP,n_delay))/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
+            #if is_collect_obs:
+            obs_on_road.append([ts, float(np.random.randint(n_delay - TIME_PER_STEP,n_delay))/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
             action = agent.choose_action_with_delayed_obs(obs_on_road, ts)
             if action is not None:
                 #buffer_a.append(action)
-                is_collect_obs = True
+                #is_collect_obs = True
                 env.execute_new_action(action, simulator)
-            else:
-                is_collect_obs = False
+            #else:
+                #is_collect_obs = False
             simEnv.run(until=100 * (ts + 1))
         metrics.write_to_xlsx_time_step(ep)
         metrics.episode_reward[-1] = [ep, episode_reward]
