@@ -664,7 +664,7 @@ def run_delayed_scenarios(n_ep, n_delay):
                 log.logger.debug('episode-%d time_step-%d, reward = %f\n' % (ep, ts, reward))
                 #buffer_r.append(reward)
             #if is_collect_obs:
-            obs_on_road.append([ts, float(np.random.randint(n_delay - TIME_PER_STEP,n_delay))/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
+            obs_on_road.append([ts, float(np.random.randint(0,n_delay))/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
             action = agent.choose_action_with_delayed_obs(obs_on_road, ts)
             if action is not None:
                 #buffer_a.append(action)

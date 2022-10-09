@@ -29,6 +29,7 @@ class HADC:
 
         self.pending_action, self.pending_state = None, None
         self.buffer_s, self.buffer_r, self.buffer_a = [], [], []
+        self.last_obs_id = -1
 
     def _build_networks(self):
         for i, params in enumerate(ACS.actors):
@@ -156,9 +157,21 @@ class HADC:
 
     def choose_action_with_delayed_obs(self, obs_on_road, ts):
         avai_obs = None
+        arrived_obs = []
         for i, obs in enumerate(obs_on_road):
             if obs[0] + obs[1] < ts:
-                avai_obs = obs
+                arrived_obs.append(obs)
+        max_delay = 0
+        index, is_avai_obs = 0, False
+        for i, obs in enumerate(arrived_obs):
+            if obs[0] > self.last_obs_id:
+                if obs[0] + obs[1] > max_delay:
+                    max_delay = obs[0] + obs[1]
+                    index = i
+                    is_avai_obs = True
+                    self.last_obs_id = obs[0]
+        if is_avai_obs is True:
+            avai_obs = arrived_obs[index]
 
         if ts == 199: # 200 time steps
             if avai_obs is None:
@@ -177,12 +190,14 @@ class HADC:
             self.update(bs, self.buffer_a, br)
             self.buffer_s, self.buffer_a, self.buffer_r = [], [], []
             self.pending_action, self.pending_state = None, None
+            self.last_obs_id = -1
             return None
 
         if avai_obs == None:
             return None # No action
         #print(avai_obs)
-        obs_on_road.remove(avai_obs)
+        for obs in arrived_obs:
+            obs_on_road.remove(obs)
         action = self.choose_actions(avai_obs[2])
 
         if self.pending_action is not None:
