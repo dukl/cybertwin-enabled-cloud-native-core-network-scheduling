@@ -11,7 +11,7 @@ from results.metrics import metrics, VALUE
 from agent.tree_structure_agent_no_delay import TSAND
 from agent.hybrid_agent_d_c import HADC
 
-EP_MAX, EP_LEN, BATCH, GAMMA = 1, 200, 200, 0.9
+EP_MAX, EP_LEN, BATCH, GAMMA = 2, 200, 200, 0.9
 TIME_PER_STEP = 100
 
 
@@ -123,7 +123,7 @@ class NF:
             next_nf_inst = self.determize_next_nf_inst_new(next_nf, flow)
             if next_nf_inst is None:
                 metrics.value[-1].n_fail_reqs += 1 # no avai instances in this node
-                log.logger.debug('no available nf for flow-%d-%d-%d' % (flow.ue_id, flow.pro_id, flow.msg_id))
+                #log.logger.debug('no available nf for flow-%d-%d-%d' % (flow.ue_id, flow.pro_id, flow.msg_id))
                 continue
 
             #self.n_flow_process[next_nf] = (self.n_flow_process[next_nf]+1) % sum(self.weight_load[next_nf])
@@ -478,7 +478,7 @@ class ENV_SIMPY:
                         sum_n_inst += 1
                         sum_n_res += inst.allocated_resource
             n_insts.append(sum_n_inst)
-            log.logger.debug('node-%d maximum_res = %f, occupied_res = %f' % (i, self.nodes[i].maximum_resource, sum_n_res))
+            #log.logger.debug('node-%d maximum_res = %f, occupied_res = %f' % (i, self.nodes[i].maximum_resource, sum_n_res))
             n_res.append(self.nodes[i].maximum_resource - sum_n_res)
             n_max_res.append(self.nodes[i].maximum_resource)
         #print('dukl1 ', n_res)
@@ -628,7 +628,7 @@ def run_no_delay_scenario(n_ep):
 
 def run_delayed_scenarios(n_ep, n_delay):
     metrics.episode_reward.clear()
-    agent = TSAND()
+    agent = HADC()
     obs_on_road = []
     for ep in range(n_ep):
         metrics.value.clear()
@@ -639,27 +639,46 @@ def run_delayed_scenarios(n_ep, n_delay):
         params = PARAMS(env.nfs, env.nodes, env.msg_on_road, env.nodes_delay_map)
         simulator = FlowSimulator(simEnv, params, env)
         simulator.start()
+        buffer_s, buffer_a, buffer_r = [], [], []
         x_ = np.arange(0, 6.48, 0.01)
-        sin_x = np.sin(x_) * 10 + 10
+        sin_x = np.sin(x_) * 100 + 100
         episode_reward = 0
+        is_collect_obs = True
         for ts in range(EP_LEN):
             if sin_x[ts + 2] < 1e-5:
                 params.inter_arr_mean = 100
             else:
                 params.inter_arr_mean = 100/sin_x[ts + 2]
-            ##log.logger.debug('time step: %d\n' % (ts))
+            log.logger.debug('time step: %d' % (ts))
             metrics.value.append(VALUE())
             metrics.value[-1].n_ts = ts
             metrics.value[-1].n_episode = ep
             s = env.obtain_state(ep, ts)
+            #buffer_s.append(s)
             if ts == 0:
-                reward = -1
+                reward = None
             else:
                 reward = env.compute_reward()
-            obs_on_road.append([ts, np.random.randint(0,n_delay)/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
+                episode_reward += reward
+                metrics.value[-1].episode_reward = episode_reward
+                log.logger.debug('episode-%d time_step-%d, reward = %f\n' % (ep, ts, reward))
+                #buffer_r.append(reward)
+            if is_collect_obs:
+                obs_on_road.append([ts, float(np.random.randint(n_delay - TIME_PER_STEP,n_delay))/TIME_PER_STEP, s, reward]) #　ｎ_delay = 100
             action = agent.choose_action_with_delayed_obs(obs_on_road, ts)
+            if action is not None:
+                #buffer_a.append(action)
+                is_collect_obs = True
+                env.execute_new_action(action, simulator)
+            else:
+                is_collect_obs = False
+            simEnv.run(until=100 * (ts + 1))
+        metrics.write_to_xlsx_time_step(ep)
+        metrics.episode_reward[-1] = [ep, episode_reward]
+        log.logger.debug('episode_reward-%d, reward = %f' % (ep, episode_reward))
+    metrics.write_to_xlsx_episode()
 
 
 if __name__ == '__main__':
-    run_no_delay_scenario(EP_MAX)
-    #run_delayed_scenarios(EP_MAX, 300)
+    #run_no_delay_scenario(EP_MAX)
+    run_delayed_scenarios(EP_MAX, 400)

@@ -27,6 +27,9 @@ class HADC:
 
         self.sess.run(tf.global_variables_initializer())
 
+        self.pending_action, self.pending_state = None, None
+        self.buffer_s, self.buffer_r, self.buffer_a = [], [], []
+
     def _build_networks(self):
         for i, params in enumerate(ACS.actors):
             if i == 0:
@@ -149,3 +152,47 @@ class HADC:
             adv = self.sess.run(self.critic.advantage, {self.critic.tfs: s, self.critic.tfdc_r: r})
             [self.sess.run(actor.atrain_op, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}) for _ in range(self.a_update_steps)]
         [self.sess.run(self.critic.ctrain_op, {self.critic.tfs: s, self.critic.tfdc_r: r}) for _ in range(self.c_update_steps)]
+
+
+    def choose_action_with_delayed_obs(self, obs_on_road, ts):
+        avai_obs = None
+        for i, obs in enumerate(obs_on_road):
+            if obs[0] + obs[1] < ts:
+                avai_obs = obs
+
+        if ts == 199: # 200 time steps
+            if avai_obs is None:
+                v_s_ = self.critic.get_v(self.buffer_s[-1])
+            else:
+                v_s_ = self.critic.get_v(avai_obs[2])
+            #print('s_: value = %f' % (v_s_))
+            discounted_r = []
+            for r in self.buffer_r[::-1]:
+                #print(r)
+                v_s_ = r + 0.9 * v_s_
+                discounted_r.append(v_s_)
+            discounted_r.reverse()
+            # print('discounted_r: ', discounted_r)
+            bs, br = np.vstack(self.buffer_s), np.array(discounted_r)[:, np.newaxis]
+            self.update(bs, self.buffer_a, br)
+            self.buffer_s, self.buffer_a, self.buffer_r = [], [], []
+            self.pending_action, self.pending_state = None, None
+            return None
+
+        if avai_obs == None:
+            return None # No action
+        #print(avai_obs)
+        obs_on_road.remove(avai_obs)
+        action = self.choose_actions(avai_obs[2])
+
+        if self.pending_action is not None:
+            self.buffer_s.append(self.pending_state)
+            self.buffer_a.append(self.pending_action)
+            self.buffer_r.append(avai_obs[3])
+            #print(avai_obs)
+        self.pending_state = avai_obs[2]
+        self.pending_action = action
+
+        return action
+
+
