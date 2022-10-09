@@ -74,6 +74,7 @@ class NF:
         avai_inst = self.env.check_node_nf_insts(nnf_loc_id, nnf_id)
         min_ratio = 1000
         ret_inst = None
+        #log.logger.debug('avai_inst = %d' % (len(avai_inst)))
         for i, inst in enumerate(avai_inst):
             if len(inst.message_queue.items) / inst.allocated_resource < min_ratio:
                 min_ratio = len(inst.message_queue.items) / inst.allocated_resource
@@ -121,6 +122,8 @@ class NF:
 
             next_nf_inst = self.determize_next_nf_inst_new(next_nf, flow)
             if next_nf_inst is None:
+                metrics.value[-1].n_fail_reqs += 1 # no avai instances in this node
+                log.logger.debug('no available nf for flow-%d-%d-%d' % (flow.ue_id, flow.pro_id, flow.msg_id))
                 continue
 
             #self.n_flow_process[next_nf] = (self.n_flow_process[next_nf]+1) % sum(self.weight_load[next_nf])
@@ -176,8 +179,8 @@ class ENV_SIMPY:
                 #self.nfs[i][j*ACS.n_node + loc_id].is_alive = True
                 #self.nfs[i][j*ACS.n_node + loc_id].is_alive_event.succeed()
                 #log.logger.debug('nf-%d-%d-%d evoked' % (self.nfs[i][j*ACS.n_node + loc_id].loc_id, self.nfs[i][j*ACS.n_node + loc_id].id, self.nfs[i][j*ACS.n_node + loc_id].inst_id))
-            inst_id = random.randint(0, ACS.n_max_inst-1)
-            loc_id  = random.randint(0, ACS.n_node - 1)
+            inst_id = 0#random.randint(0, ACS.n_max_inst-1)
+            loc_id  = 0#random.randint(0, ACS.n_node - 1)
             self.nfs[i][inst_id*ACS.n_node + loc_id].is_alive_event.succeed()
             self.nfs[i][inst_id*ACS.n_node + loc_id].is_alive = True
             log.logger.debug('nf-%d-%d-%d evoked' % (self.nfs[i][inst_id*ACS.n_node + loc_id].loc_id, self.nfs[i][inst_id*ACS.n_node + loc_id].id, self.nfs[i][inst_id*ACS.n_node + loc_id].inst_id))
@@ -282,16 +285,17 @@ class ENV_SIMPY:
         for i in range(ACS.n_node):
             for j in range(len(ACS.t_NFs)-1):
                 avai_insts = self.check_available_instance_by_nf_id(j+1)
-                unavai_insts = self.check_available_instances(i, j+1)
+                unavai_insts = self.check_available_instances(j+1, i)
                 n_inst = ACS.n_max_inst - len(unavai_insts)
-                if action.h_s[i*(len(ACS.t_NFs)-1) + j] - 1 == -1:
+                if action.h_s[i,j] == -1:
                     if len(avai_insts) == 1:
-                        log.logger.debug('at least one instance')
+                        #log.logger.debug('at least one instance')
+                        pass
                     elif n_inst - 1 < 0:
-                        log.logger.debug('no active instance')
+                        #log.logger.debug('no active instance')
                         pass
                     else:
-                        log.logger.debug('close this instance')
+                        #log.logger.debug('close this instance')
                         nf_instances = list(set(self.nodes[i].nfs[j+1]) - set(unavai_insts))
                         nf_instances.sort(key=lambda NF: len(NF.message_queue.items), reverse=False)
                         ##log.logger.debug('deleting an instance nf-%d-%d-%d' % (nf_instances[0].loc_id, nf_instances[0].id, nf_instances[0].inst_id))
@@ -300,30 +304,32 @@ class ENV_SIMPY:
                         nf_instances[0].allocated_resource = 100
                         avai_insts = self.check_available_instance_by_nf_id(nf_instances[0].id)
                         self.sim_env.process(self.moving_flows(nf_instances[0], avai_insts))
-                if action.h_s[i * (len(ACS.t_NFs) - 1) + j] - 1 == 0:
-                    log.logger.debug('maintain')
+                if action.h_s[i,j] == 0:
+                    #log.logger.debug('maintain')
                     pass
-                if action.h_s[i * (len(ACS.t_NFs) - 1) + j] - 1 == 1:
-                    log.logger.debug('add one instance')
-                    pass
-                if n_inst + 1 > ACS.n_max_inst:
-                    log.logger.debug('exceed maximum instance at this node')
-                else:
-                    idx = random.randint(0, len(unavai_insts) - 1)
-                    unavai_insts[idx].is_alive = True
-                    unavai_insts[idx].is_alive_event.succeed()
+                if action.h_s[i,j] == 1:
+                    #log.logger.debug('add one instance')
+                    if n_inst + 1 > ACS.n_max_inst:
+                        pass
+                        #log.logger.debug('exceed maximum instance at this node')
+                    else:
+                        node_res_remain = self.nodes[i].get_resources_used()
+                        if node_res_remain + 100 <= self.nodes[i].maximum_resource:
+                            idx = random.randint(0, len(unavai_insts) - 1)
+                            unavai_insts[idx].is_alive = True
+                            unavai_insts[idx].is_alive_event.succeed()
                 nf_instances = list(set(self.nodes[i].nfs[j + 1]) - set(unavai_insts))
                 for n, inst in enumerate(nf_instances):
                     node_res_remain = self.nodes[inst.loc_id].get_remain_resources(inst.id, inst.inst_id)
                     if inst.allocated_resource * (1 + action.v_s[i*(len(ACS.t_NFs)-1) + j][n]) > node_res_remain:
-                        log.logger.debug('exceed maximum resources for node-%d' % (inst.loc_id))
+                        #log.logger.debug('exceed maximum resources for node-%d' % (inst.loc_id))
                         continue
                     if inst.allocated_resource * (1 + action.v_s[i * (len(ACS.t_NFs) - 1) + j][n]) < 100:
                         continue
                     inst.allocated_resource = inst.allocated_resource * (1 + action.v_s[i * (len(ACS.t_NFs) - 1) + j][n])
         simulator.scheduling_table = action.sch
         #tmp = np.sum(action.sch, 1).reshape(-1, 1)
-        simulator.scheduling_table = (simulator.scheduling_table * 10).astype('int32')
+        simulator.scheduling_table = np.array(simulator.scheduling_table * 10).astype('int32')
         simulator.index = np.zeros((len(ACS.msg_msc), (len(ACS.t_NFs) - 1)))
 
     def execute_action(self, action):
@@ -472,6 +478,7 @@ class ENV_SIMPY:
                         sum_n_inst += 1
                         sum_n_res += inst.allocated_resource
             n_insts.append(sum_n_inst)
+            log.logger.debug('node-%d maximum_res = %f, occupied_res = %f' % (i, self.nodes[i].maximum_resource, sum_n_res))
             n_res.append(self.nodes[i].maximum_resource - sum_n_res)
             n_max_res.append(self.nodes[i].maximum_resource)
         #print('dukl1 ', n_res)
