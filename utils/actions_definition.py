@@ -9,6 +9,10 @@ class ACTIONS:
         #self.scheduling_src_nf_idx = 0
         #self.scheduling_dst_nf_idx = 0
         #self.scheduling = [0 for _ in range(ACS.n_max_inst*ACS.n_max_inst)]
+        self.id = id
         self.h_s = None
+        self.raw_h_s = None
         self.v_s = None
+        self.raw_v_s = None
         self.sch = None
+        self.raw_sch = None

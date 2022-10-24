@@ -92,12 +92,10 @@ class DQNAgent:
             model.add(Dense(64, activation='relu'))
             model.add(Dense(output_size, activation='linear'))
         else:
-            model.add(Dense(1024, input_dim=input_size, activation='relu'))
-            model.add(Dense(1024, activation='relu'))
-            model.add(Dense(1024, activation='relu'))
-            model.add(Dense(1024, activation='relu'))
-            model.add(Dense(512, activation='relu'))
-            model.add(Dense(output_size, activation='softmax'))
+            model.add(Dense(128, input_dim=input_size, activation='relu'))
+            model.add(Dense(64, activation='relu'))
+            #model.add(Dense(512, activation='relu'))
+            model.add(Dense(output_size, activation='linear'))
 
         model.compile(loss=loss,
                       optimizer=Adam(lr=self.learning_rate))
@@ -124,11 +122,12 @@ class DQNAgent:
             self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, eval=False):
-        #log.logger.debug('action epsilon = %f' % (self.epsilon))
-        if not eval and np.random.rand() > self.epsilon:
-            #log.logger.debug('[DQN][Chose Action Randomly]')
+        self.epsilon *= self.epsilon_decay
+        log.logger.debug('action epsilon = %f' % (self.epsilon))
+        if not eval and np.random.rand() < self.epsilon:
+            log.logger.debug('[DQN][Chose Action Randomly]')
             return random.randrange(self.action_size)
-        #log.logger.debug('[DQN][Chose Action With DQN Model]')
+        log.logger.debug('[DQN][Chose Action With DQN Model]')
         state = np.reshape(state, [1,state.shape[0]])
         #print(state.shape)
         act_values = self.model.predict(state)
@@ -231,8 +230,8 @@ class DDQNAgent(DQNAgent):
         #log.logger.debug('batch: \n%s' % (str(batch)))
         sample_loss = self.train_model(batch)
         update_loss(loss, sample_loss)
-        self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
-        log.logger.debug('training epsilon = %f' % (self.epsilon))
+        #self.epsilon = self.epsilon + self.epsilon_increment if self.epsilon < self.epsilon_max else self.epsilon_max
+        #log.logger.debug('training epsilon = %f' % (self.epsilon))
         #if self.epsilon > self.epsilon_min:
         #    self.epsilon *= self.epsilon_decay
         return loss

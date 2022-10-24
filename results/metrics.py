@@ -30,18 +30,21 @@ class VALUE:
         self.action_src_nf_select = 0
         self.action_dst_nf_select = 0
         self.punish_reward = 0
+        self.n_overload = 0
+        self.n_timeout = 0
+        self.n_inst = 0
         #self.action_scale_up_dn = []
 
     def get_list_value(self):
         return [self.n_episode, self.n_ts, self.total_reqs, self.n_succ_reqs, self.n_fail_reqs, self.qos_throughput,
                 self.average_delay, self.qos_delay, self.qos, self.qos_weight, self.res_mean, self.res_var, self.res_distribution, self.res, self.res_weight, self.time_step_reward, self.episode_reward,
-                self.action_ops, self.action_nf_select, self.actor_node_select, self.action_src_nf_select, self.action_dst_nf_select, self.punish_reward]
+                self.action_ops, self.action_nf_select, self.actor_node_select, self.action_src_nf_select, self.action_dst_nf_select, self.punish_reward, self.n_overload, self.n_timeout, self.n_inst]
 
 class METRICS:
     def __init__(self):
         self.excel_path = '../results/metrics-' +str(now_time.year) + '-' + str(now_time.month) + '-' + str(now_time.day) + '-' + str(now_time.hour) +'-' + str(now_time.minute) + '/'
         self.title = ['episode', 'time_step', 'total_reqs', 'n_succ', 'n_fail', 'QoS_throughput','aver_delay','QoS_delay','QoS','QoS_weight','Res_mean','Res_var','Res_distri','Res','Res_weight',
-                      'time_step_reward','episode_reward','action_ops', 'action_nf_select', 'actor_node_select', 'action_src_nf_select', 'action_dst_nf_select', 'punish_reward']
+                      'time_step_reward','episode_reward','action_ops', 'action_nf_select', 'actor_node_select', 'action_src_nf_select', 'action_dst_nf_select', 'punish_reward', 'n_overload', 'n_timeout', 'n_inst']
         self.book = None
         self.sheet = None
         self.rows = 0
@@ -83,7 +86,7 @@ class METRICS:
                 for idx, value in enumerate(list_value):
                     sheet.write(rows, idx, value)
                 rows += 1
-        book.save(file_name)
+            book.save(file_name)
         #else:
         #    print('old excel file')
         #    self.book = xlrd.open_workbook(self.excel_path)

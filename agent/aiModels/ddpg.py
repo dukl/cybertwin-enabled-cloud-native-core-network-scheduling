@@ -1,3 +1,4 @@
+import math
 import random
 
 import numpy
@@ -12,9 +13,11 @@ from keras.layers import Dense, Dropout, Input
 from keras.layers.merge import Add, Concatenate
 from keras.optimizers import Adam
 import keras.backend as K
+import keras
 from collections import deque
 from utils.logger import log
-
+from utils.actions_definition import ACTIONS
+import utils.auto_scaling_settings as ACS
 
 class Ornstein_Uhlenbeck_Noise:
     def __init__(self, mu, sigma=1.0, theta=0.15, dt=1e-2, x0=None):
@@ -54,12 +57,14 @@ class DDPG:
         self.sess = tf.Session()
         self.epsilon = 0.9
         self.gamma   = 0.99
-        self.epsilon_decay = 0.9995
+        self.epsilon_decay = 0.99985
         self.tau     = 0.001
         self.memory  = deque(maxlen=400000)
         self.update_ite = 0
         self.obs_dim = obs_dim
         self.act_dim = act_dim
+        self.last_obs_id = -1
+        self.delayed_reward = None
 
         self.actor_state_input, self.actor_model = self.create_actor_model()
         _, self.target_actor_model = self.create_actor_model()
@@ -67,7 +72,7 @@ class DDPG:
         actor_model_weights    = self.actor_model.trainable_weights
         self.actor_grads = tf.gradients(self.actor_model.output, actor_model_weights, -self.actor_critic_grad)
         grads = zip(self.actor_grads, actor_model_weights)
-        self.optimize = tf.train.AdamOptimizer(0.001).apply_gradients(grads)
+        self.optimize = tf.train.AdamOptimizer(0.0001).apply_gradients(grads)
 
         self.critic_state_input, self.critic_action_input, self.critic_model = self.create_critic_model()
         _, _, self.target_critic_model = self.create_critic_model()
@@ -80,35 +85,38 @@ class DDPG:
         self.pending_s = None
         self.pending_a = None
 
+    def reset(self):
+        self.last_obs_id = -1
+        self.pending_s = None
+        self.pending_a = None
+
     def create_actor_model(self):
         state_input = Input(shape=(self.obs_dim,))
-        h = Dense(1024, activation='relu')(state_input)
-        h = Dense(1024, activation='relu')(h)
-        h2 = Dense(1024, activation='relu')(h)
-        output = Dense(self.act_dim, activation='tanh')(h2)
+        h = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024), seed=None))(state_input)
+        h2 = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(h)
+        output = Dense(self.act_dim, activation='tanh', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.05))(h2)
         model = Model(inputs=state_input, outputs=output)
-        adam = Adam(lr=0.001)
+        adam = Adam(lr=0.00001)
         model.compile(loss="mse", optimizer=adam)
         return state_input, model
 
     def create_critic_model(self):
         state_input = Input(shape=(self.obs_dim,))
-        state_h = Dense(1024, activation='relu')(state_input)
-        state_h = Dense(1024)(state_h)
-        state_h2 = Dense(1024)(state_h)
+        state_h = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(state_input)
+        state_h2 = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(state_h)
         action_input = Input(shape=(self.act_dim,))
-        action_h = Dense(1024)(action_input)
-        action_h = Dense(1024)(action_h)
-        action_h2 = Dense(1024)(action_h)
+        action_h = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(action_input)
+        action_h2 = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(action_h)
         merged = Concatenate()([state_h2, action_h2])
-        merged_h1 = Dense(1024, activation='relu')(merged)
+        merged_h1 = Dense(1024, activation='relu', kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=math.sqrt(1024)))(merged)
         output = Dense(1, activation='linear')(merged_h1)
         model = Model(inputs=[state_input, action_input], outputs=output)
-        adam = Adam(lr=0.001)
+        adam = Adam(lr=0.0001)
         model.compile(loss="mse", optimizer=adam)
         return state_input, action_input, model
 
     def act(self, state):
+        act_value = None
         state = state.reshape(1, state.shape[0])
         #log.logger.debug('[line-24][generate action value to be executed]')
         self.epsilon *= self.epsilon_decay
@@ -117,24 +125,103 @@ class DDPG:
             #log.logger.debug('%s' % (str(action.tolist())))
             noise = []
             for i in range(action.shape[1]):
-                tmp = Ornstein_Uhlenbeck_Noise(sigma=5, mu=np.zeros(1))
+                tmp = Ornstein_Uhlenbeck_Noise(sigma=2, mu=np.zeros(1))
+                #print('noise = ', tmp())
                 noise.append(tmp()[0])
             #log.logger.debug('noise = \n %s' % (str(noise)))
-            return action + numpy.array(noise)
-        return self.actor_model.predict(state)
+            act_value = action + numpy.array(noise)
+            #return action + numpy.array(noise)
+        else:
+            act_value = self.actor_model.predict(state)
+        return act_value#self.shape_action(act_value)
+
+    def shape_action(self, input):
+        output = []
+        for i in range(input.shape[0]):
+            act_value = input[i,:]
+            act_value += 1e-5
+            act_value = (np.max(act_value) - act_value) / (np.max(act_value) - np.min(act_value))
+            act_value = act_value.reshape(len(ACS.t_NFs) - 1, ACS.n_node)
+            for i in range(act_value.shape[0]):
+                act_value[i, :] = (act_value[i, :] / np.sum(act_value[i, :]))
+            act_value = act_value.flatten()
+            output.append(act_value)
+        #print(numpy.array(output).shape)
+        return numpy.array(output)
+
+    def shape_h_s_action(self, input):
+        h_s_out = input.reshape((ACS.n_node, len(ACS.t_NFs) - 1))
+        h_s_out[h_s_out < -0.6] = -1
+        h_s_out[h_s_out > 0.6] = 1
+        # print(h_s_out.astype('int32'))
+        h_s_out = h_s_out.astype('int32')
+        return h_s_out
+
+    def choose_action_with_delayed_obs(self, obs_on_road, ts):
+        avai_obs = None
+        arrived_obs = []
+        for i, obs in enumerate(obs_on_road):
+            if obs[0] + obs[1] <= ts:
+                arrived_obs.append(obs)
+        max_delay = 0
+        index, is_avai_obs = 0, False
+        for i, obs in enumerate(arrived_obs):
+            if obs[0] > self.last_obs_id:
+                if obs[0] + obs[1] >= max_delay:
+                    max_delay = obs[0] + obs[1]
+                    index = i
+                    is_avai_obs = True
+                    self.last_obs_id = obs[0]
+        if is_avai_obs is True:
+            avai_obs = arrived_obs[index]
+        if avai_obs == None:
+            return None # No action
+
+        for obs in arrived_obs:
+            obs_on_road.remove(obs)
+
+        #log.logger.debug('receive obs: %s at ts=%d' % (str(avai_obs), ts))
+        v_s = self.act(avai_obs[2])
+        #print(v_s)
+        self.remember(avai_obs[2], v_s, avai_obs[3])
+
+        v_s += 1e-5
+        v_s = (np.max(v_s) - v_s) / (np.max(v_s) - np.min(v_s))
+
+        v_s = v_s.reshape((ACS.n_node, (len(ACS.t_NFs) - 1) * ACS.n_max_inst))
+        for i in range(v_s.shape[0]):
+            v_s[i,:] = v_s[i,:] / np.sum(v_s[i,:])
+
+        ret_a = ACTIONS()
+
+        ret_a.v_s = v_s
+        ret_a.h_s = np.zeros((ACS.n_node, len(ACS.t_NFs)-1)).astype('int32')
+        #ret_a.h_s = self.shape_h_s_action(v_s)
+        #ret_a.sch = ret_a.sch.reshape(len(ACS.t_NFs) - 1, ACS.n_node)
+        #print(ret_a.v_s)
+
+        return ret_a
 
     def remember(self, s, a, r):
+        log.logger.debug('remember')
         if self.pending_s is not None:
             self.memory.append([self.pending_s, self.pending_a, r, s])
-            self.pending_s, self.pending_a = s, a
-        else:
-            self.pending_s, self.pending_a = s, a
+            #self.pending_s, self.pending_a = s, a
+            #print(self.memory[-1])
+        self.pending_s, self.pending_a = s, a
+        if len(self.memory) >=64 and len(self.memory) % 64 == 0:
+            self.train(64)
 
     def train(self, batch_size):
+        log.logger.debug('training ... ')
         samples = random.sample(self.memory, batch_size)
+        #print('samples = \n%s', samples)
         self.samples = samples
         self.train_critic(samples)
         self.train_actor(samples)
+        self.update_ite += 1
+        if self.update_ite % 10 == 0:
+            self.update_target()
 
     def train_critic(self, samples):
         log.logger.debug('[Training critic]')
@@ -143,8 +230,7 @@ class DDPG:
         #log.logger.debug('s_t+1 = \n%s' % (str(s_ts1[0].tolist())))
         #log.logger.debug('actions = \n%s' % (str(actions.tolist())))
         target_actions = self.target_actor_model.predict(s_ts1)
-        target_actions = (target_actions - numpy.min(target_actions)) / (numpy.max(target_actions) - numpy.min(target_actions)) * GP.n_servers * GP.n_ms_server * GP.ypi_max
-        target_actions = target_actions.astype('int')
+        #target_actions = self.shape_action(target_actions)
         #log.logger.debug('target_actions = \n %s' % (str(target_actions.tolist())))
         future_rewards = self.target_critic_model.predict([s_ts1, target_actions])
         #log.logger.debug('train_critic, future_rewards = \n%s' % (str(future_rewards.tolist())))
@@ -158,8 +244,7 @@ class DDPG:
         log.logger.debug('[Training actor]')
         s_ts, _, _, _ = stack_samples(samples)
         predicted_actions = self.actor_model.predict(s_ts)
-        predicted_actions = (predicted_actions - numpy.min(predicted_actions)) / (numpy.max(predicted_actions) - numpy.min(predicted_actions)) * GP.n_servers * GP.n_ms_server * GP.ypi_max
-        predicted_actions = predicted_actions.astype('int')
+        #predicted_actions = self.shape_action(predicted_actions)
         grads = self.sess.run(self.critic_grads, feed_dict={
             self.critic_state_input: s_ts,
             self.critic_action_input: predicted_actions

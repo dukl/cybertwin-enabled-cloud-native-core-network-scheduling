@@ -29,8 +29,12 @@ class FlowSimulator:
         self.env_nfs = params.nfs
         self.params = params
         self.ues = [None for _ in range(ACS.n_max_ues)]
-        self.scheduling_table = np.ones((len(ACS.msg_msc)*(len(ACS.t_NFs)-1), ACS.n_node))
-        self.index = np.zeros((len(ACS.msg_msc), (len(ACS.t_NFs) - 1)))
+        self.scheduling_table = np.ones(((len(ACS.t_NFs)-1), ACS.n_node)) #np.random.randint(1,20, size=(len(ACS.msg_msc)*(len(ACS.t_NFs)-1), ACS.n_node))
+        self.index = np.zeros(len(ACS.t_NFs) - 1)
+        self.ue_idx = 0
+        self.ue_pro_idx = 0
+        self.msg_id = 0
+
 
     def start(self):
         ##log.logger.debug('Starting simulation')
@@ -62,19 +66,36 @@ class FlowSimulator:
             #    #log.logger.debug('continue messages ... msg_on_road-%d-%d, delay=%f, last_time=%f' % (i, j, flow.in_msg_on_road_time - last_time, last_time))
             #    yield self.env.timeout(abs(flow.in_msg_on_road_time - last_time))
             #    last_time = flow.in_msg_on_road_time
-            if len(self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].message_queue.items) + 1 > ACS.n_max_load_in_nf[ACS.msg_msc[flow.msg_id][flow.index]]:
-                log.logger.debug('nf-%d-%d-%d overload' % (self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].loc_id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id))
+            if len(self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].message_queue.items) + 1 > self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].max_load:#ACS.n_max_load_in_nf[ACS.msg_msc[flow.msg_id][flow.index]]:
+                #if self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].loc_id == 0 and self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id == 3 and self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id == 0:
+                #log.logger.debug('nf-%d-%d-%d overload' % (self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].loc_id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id))
                 metrics.value[-1].n_fail_reqs += 1
+                metrics.value[-1].n_overload += 1
             else:
                 if self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].is_alive == True:
+                    #log.logger.debug('before nf-%d-%d-%d has load %d time=%f' % (self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].loc_id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id, len(self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].message_queue.items), self.env.now))
                     yield self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].message_queue.put(flow) # which instance
+                    #log.logger.debug('after nf-%d-%d-%d has load %d time=%f' % (
+                    #self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id * ACS.n_node + j].loc_id,
+                    #self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id * ACS.n_node + j].id,
+                    #self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id * ACS.n_node + j].inst_id,
+                    #len(self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id * ACS.n_node + j].message_queue.items), self.env.now))
+                    #if self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id * ACS.n_node + j].loc_id == 0 and self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id == 3 and self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id == 0:
+                    #    log.logger.debug('flow-%d-%d-%d arrival nf-%d-%d-%d at time %f' % (
+                    #    flow.ue_id, flow.pro_id, flow.msg_id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].loc_id, self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].id,
+                    #    self.env_nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id*ACS.n_node+j].inst_id, self.env.now))
                 else:
                     avai_insts = self.g_env.check_available_instance_by_nf_id(ACS.msg_msc[flow.msg_id][flow.index])
                     is_avai = False
                     for inst in avai_insts: # same location
                         if inst.is_alive == True:
                             if inst.loc_id == j:
-                                yield self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].message_queue.put(flow)
+                                if len(self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].message_queue.items) + 1 > self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].max_load:  # ACS.n_max_load_in_nf[ACS.msg_msc[flow.msg_id][flow.index]]:
+                                    metrics.value[-1].n_fail_reqs += 1
+                                    metrics.value[-1].n_overload += 1
+                                else:
+                                    yield self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].message_queue.put(flow)
+                                #log.logger.debug('here')
                                 #log.logger.debug('flow-%d-%d-%d arrival nf-%d-%d-%d at time %f' % (flow.ue_id, flow.pro_id, flow.msg_id,self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].loc_id, inst.id,self.env_nfs[inst.id][inst.inst_id*ACS.n_node+j].inst_id, self.env.now))
                                 is_avai = True
                                 break
@@ -84,6 +105,7 @@ class FlowSimulator:
                                 flow.nf_inst_id = inst.inst_id
                                 flow.in_msg_on_road_time = self.env.now
                                 yield self.g_env.msg_on_road[j][inst.loc_id].put(flow)
+                                #log.logger.debug('here2')
                                 #log.logger.debug('send flow-%d-%d-%d to nf-%d-%d-%d, msg_on_road-%d-%d: leaving at time %f' % (flow.ue_id, flow.pro_id, flow.msg_id, inst.loc_id, inst.id, inst.inst_id, j, inst.loc_id, self.env.now))
                                 break
                 #yield self.nodes[j].nfs[ACS.msg_msc[flow.msg_id][flow.index]][flow.nf_inst_id].put(flow)
@@ -98,15 +120,27 @@ class FlowSimulator:
             for nf in ACS.msg_msc[flow.msg_id]:
                 if nf == 0:
                     continue
-                sum = 0
+                #if nf == 1:
+                #    log.logger.debug('table = %s' % (str(self.scheduling_table[nf-1])))
+                #    log.logger.debug('index = %s' % (str(self.index[nf - 1])))
+                sum, is_append, node_id = 0, False, 0
                 for i in range(ACS.n_node):
-                    sum += self.scheduling_table[flow.msg_id*(len(ACS.t_NFs)-1)+nf-1, i]
-                    if self.index[flow.msg_id, nf - 1] < sum:
+                    sum += self.scheduling_table[nf-1, i]
+                    #log.logger.debug('flow-%d-%d-%d len(chain)=%d, sum=%d, index=%d' % (flow.ue_id, flow.pro_id, flow.msg_id, len(flow.node_chain), sum, self.index[flow.msg_id, nf - 1]))
+                    if self.index[nf - 1] < sum:
                         flow.node_chain.append(i)
-                        self.index[flow.msg_id][nf - 1] = (self.index[flow.msg_id][nf - 1] + 1) % (np.sum(self.scheduling_table[flow.msg_id * (len(ACS.t_NFs) - 1) + nf - 1]))
+                        is_append = True
+                        self.index[nf - 1] = (self.index[nf - 1] + 1) % (np.sum(self.scheduling_table[nf - 1]))
+                        node_id = i
                         break
+                if is_append is False:
+                    flow.node_chain.append(ACS.n_node-1)
+                    node_id = ACS.n_node - 1
+                #if nf == 1:
+                #    log.logger.debug('generate flow-%d-%d-%d-%d to be processed on node-%d' % (flow.ue_id, flow.pro_id, flow.msg_id, flow.index, node_id))
 
-            rise_id = random.randint(0, len(avai_rise)-1)
+            #rise_id = random.randint(0, len(avai_rise)-1)
+            rise_id = 0
             yield avai_rise[rise_id].message_queue.put(flow)
             #log.logger.debug('generate flow-%d-%d-%d-%d: time = %f, chain = %s' % (flow.ue_id, flow.pro_id, flow.msg_id, flow.index, self.env.now, str(flow.node_chain)))
             yield self.env.timeout(self.params.inter_arr_mean)
@@ -118,8 +152,10 @@ class FlowSimulator:
             self.ues[ue_id] = UE(ue_id)
         pro_id = random.randint(0, len(ACS.procedure) - 1)
         self.ues[ue_id].pros[pro_id] += 1
-        msg_id = random.randint(0, len(ACS.procedure[pro_id])-1)
-        flow = FLOW(ue_id, pro_id, ACS.procedure[pro_id][msg_id], self.env.now)
+        #msg_id = random.randint(0, len(ACS.procedure[pro_id])-1)
+        #flow = FLOW(ue_id, pro_id, ACS.procedure[pro_id][msg_id], self.env.now)
+        flow = FLOW(ue_id, pro_id, self.msg_id, self.env.now)
+        self.msg_id = (self.msg_id + 1) % 3#len(ACS.msg_msc)
         return flow
 
 

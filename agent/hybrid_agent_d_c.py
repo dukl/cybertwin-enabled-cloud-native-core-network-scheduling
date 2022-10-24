@@ -14,7 +14,7 @@ import numpy as np
 class HADC:
     def __init__(self):
         self.sess = tf.Session()
-        self.obs_dim = ACS.n_node * 8
+        self.obs_dim = 40#ACS.n_node * 8
         self.actor_h_s = None
         self.actor_v_s = None
         self.actor_sch = None
@@ -22,14 +22,17 @@ class HADC:
         self.critic = None
         #self._build_actor_critic_networks()
         self._build_networks()
-        self.a_update_steps = 5
-        self.c_update_steps = 5
+        self.a_update_steps = 15
+        self.c_update_steps = 15
 
         self.sess.run(tf.global_variables_initializer())
 
         self.pending_action, self.pending_state = None, None
         self.buffer_s, self.buffer_r, self.buffer_a = [], [], []
         self.last_obs_id = -1
+
+    def reset(self):
+        pass
 
     def _build_networks(self):
         for i, params in enumerate(ACS.actors):
@@ -40,8 +43,9 @@ class HADC:
                 self.actor_v_s = APPO_C(i, params[1], self.sess, params[0], self.obs_dim, params[2], layers=params[3])
                 self.actors.append(self.actor_v_s)
             elif i == 2:
-                self.actor_sch = APPO_C(i, params[1], self.sess, params[0], self.obs_dim, params[2], layers=params[3])
-                self.actors.append(self.actor_sch)
+                pass
+                #self.actor_sch = APPO_C(i, params[1], self.sess, params[0], self.obs_dim, params[2], layers=params[3])
+                #self.actors.append(self.actor_sch)
         self.critic = CPPO(self.sess, self.obs_dim, ACS.critic[0], layers=ACS.critic[1])
 
     def _build_actor_critic_networks(self):
@@ -80,7 +84,7 @@ class HADC:
         act_value = []
         h_scaling = np.zeros((ACS.n_node, len(ACS.t_NFs) - 1))
         v_scaling = [np.zeros(ACS.n_max_inst) for _ in range(ACS.n_node*(len(ACS.t_NFs) - 1))]
-        scheduling = [np.zeros(ACS.n_node) for _ in range(len(ACS.msg_msc)*(len(ACS.t_NFs) - 1))]
+        scheduling = [np.zeros(ACS.n_node) for _ in range(len(ACS.t_NFs) - 1)]
 
         thread_list = []
 
@@ -117,55 +121,78 @@ class HADC:
 
     def choose_actions(self, obs):
         action = ACTIONS()
-        h_s_out = self.actor_h_s.choose_action(obs)
-        action.raw_h_s = h_s_out
-        h_s_out = h_s_out.reshape((ACS.n_node, len(ACS.t_NFs)-1))
-        h_s_out[h_s_out<-0.6] = -1
-        h_s_out[h_s_out>0.6] = 1
+        #h_s_out = self.actor_h_s.choose_action(obs)
+        #action.raw_h_s = h_s_out
+        #h_s_out = h_s_out.reshape((ACS.n_node, len(ACS.t_NFs)-1))
+        #h_s_out[h_s_out<-0.6] = -1
+        #h_s_out[h_s_out>0.6] = 1
         #print(h_s_out.astype('int32'))
-        action.h_s = h_s_out.astype('int32')
+        #action.h_s = h_s_out.astype('int32')
+        action.h_s = np.zeros((ACS.n_node, len(ACS.t_NFs)-1)).astype('int32')
         v_s_out = self.actor_v_s.choose_action(obs)
         action.raw_v_s = v_s_out
-        v_s_out = v_s_out.reshape((ACS.n_node*(len(ACS.t_NFs)-1), ACS.n_max_inst))
-        v_s_out = np.clip(v_s_out, -1, 1)
+        #print('raw_out: \n',v_s_out)
+        v_s_out += 1e-5
+        v_s_out = (np.max(v_s_out) - v_s_out) / (np.max(v_s_out) - np.min(v_s_out))
+
+        v_s_out = v_s_out.reshape((ACS.n_node, (len(ACS.t_NFs)-1)*ACS.n_max_inst))
+        for i in range(v_s_out.shape[0]):
+            v_s_out[i,:] = v_s_out[i,:] / np.sum(v_s_out[i,:])#(np.max(v_s_out[i,:]) - v_s_out[i,:]) / (np.max(v_s_out[i,:]) - np.min(v_s_out[i,:]))
         #print(v_s_out.shape)
+        print(v_s_out)
         action.v_s = v_s_out
-        scheduling = self.actor_sch.choose_action(obs) + 1e-5
-        action.raw_sch = scheduling
-        scheduling = (np.max(scheduling) - scheduling)/(np.max(scheduling) - np.min(scheduling))
-        scheduling = scheduling.reshape((len(ACS.msg_msc)*(len(ACS.t_NFs)-1), ACS.n_node))
+        #scheduling = self.actor_sch.choose_action(obs) + 1e-5
+        #action.raw_sch = scheduling
+        #scheduling = (np.max(scheduling) - scheduling)/(np.max(scheduling) - np.min(scheduling))
+        #scheduling = scheduling.reshape((len(ACS.t_NFs)-1, ACS.n_node))
+        #for i in range(scheduling.shape[0]):
+        #    scheduling[i, :] = (scheduling[i, :] / np.sum(scheduling[i, :]))
         #print(scheduling.shape)
-        action.sch = scheduling
+        #action.sch = scheduling
         return action
 
     def update(self, s, a, r):
         action = [[] for _ in range(len(ACS.actors))]
         for i in range(len(a)):
-            action[0].append(a[i].raw_h_s)
+            #action[0].append(a[i].raw_h_s)
             action[1].append(a[i].raw_v_s)
-            action[2].append(a[i].raw_sch)
+            #action[2].append(a[i].raw_sch)
 
         ba = [[] for _ in range(len(ACS.actors))]
         for i in range(len(ACS.actors)):
+            if i == 0 or i == 2:
+                continue
             ba[i] = np.vstack(action[i])
         for i, actor in enumerate(self.actors):
+            if i == 0 or i == 2:
+                continue
             self.sess.run(actor.update_oldpi_op)
             adv = self.sess.run(self.critic.advantage, {self.critic.tfs: s, self.critic.tfdc_r: r})
-            [self.sess.run(actor.atrain_op, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}) for _ in range(self.a_update_steps)]
-        [self.sess.run(self.critic.ctrain_op, {self.critic.tfs: s, self.critic.tfdc_r: r}) for _ in range(self.c_update_steps)]
+            print(adv.tolist())
+            #print(self.sess.run(actor.oldpi_out, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}))
+            #print(self.sess.run(actor.ratio, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}))
+
+            for _ in range(self.a_update_steps):
+                print('aloss = ', self.sess.run(actor.aloss, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}))
+                self.sess.run(actor.atrain_op, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv})
+            #[self.sess.run(actor.atrain_op, {actor.tfs: s, actor.tfa: ba[i], actor.tfadv: adv}) for _ in range(self.a_update_steps)]
+            for _ in range(self.c_update_steps):
+                print('closs = ', self.sess.run(self.critic.closs, {self.critic.tfs: s, self.critic.tfdc_r: r}))
+                self.sess.run(self.critic.ctrain_op, {self.critic.tfs: s, self.critic.tfdc_r: r})
+        #[self.sess.run(self.critic.ctrain_op, {self.critic.tfs: s, self.critic.tfdc_r: r}) for _ in range(self.c_update_steps)]
 
 
     def choose_action_with_delayed_obs(self, obs_on_road, ts):
         avai_obs = None
         arrived_obs = []
         for i, obs in enumerate(obs_on_road):
-            if obs[0] + obs[1] < ts:
+            if obs[0] + obs[1] <= ts:
                 arrived_obs.append(obs)
         max_delay = 0
         index, is_avai_obs = 0, False
         for i, obs in enumerate(arrived_obs):
             if obs[0] > self.last_obs_id:
-                if obs[0] + obs[1] > max_delay:
+                if obs[0] + obs[1] >= max_delay:
                     max_delay = obs[0] + obs[1]
                     index = i
                     is_avai_obs = True
@@ -173,7 +200,8 @@ class HADC:
         if is_avai_obs is True:
             avai_obs = arrived_obs[index]
 
-        if ts == 199: # 200 time steps
+        if ts == 99: # 200 time steps
+            print('update ...')
             if avai_obs is None:
                 v_s_ = self.critic.get_v(self.buffer_s[-1])
             else:
@@ -198,6 +226,7 @@ class HADC:
         #print(avai_obs)
         for obs in arrived_obs:
             obs_on_road.remove(obs)
+        #print(avai_obs[2])
         action = self.choose_actions(avai_obs[2])
 
         if self.pending_action is not None:

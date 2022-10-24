@@ -25,11 +25,12 @@ class APPO_C:
             self.update_oldpi_op = [oldp.assign(p) for p ,oldp in zip(self.pi_params, self.oldpi_params)]
         self.tfa = tf.placeholder(tf.float32, [None, self.act_dim], 'ac_action_'+str(self.id))
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'ac_advantage_'+str(self.id))
+        #self.oldpi_out = self.oldpi.prob(self.tfa) + 1e-5
         with tf.variable_scope('loss_'+str(self.id)):
             with tf.variable_scope('surrogate_'+str(self.id)):
                 self.ratio = self.pi.prob(self.tfa) / (self.oldpi.prob(self.tfa) + 1e-5)
                 surr = self.ratio * self.tfadv
-            self.aloss = -tf.reduce_mean(tf.minimum(
+            self.aloss = tf.reduce_mean(tf.minimum(
                 surr,
                 tf.clip_by_value(self.ratio, 1. - self.epsilon, 1. + self.epsilon) * self.tfadv
             ))
@@ -44,7 +45,7 @@ class APPO_C:
                     l_a = tf.layers.dense(self.tfs, layer, tf.nn.relu, trainable=trainable)
                 else:
                     l_a = tf.layers.dense(l_a, layer, tf.nn.relu, trainable=trainable)
-            mu = 2 * tf.layers.dense(l_a, self.act_dim, tf.nn.tanh, trainable=trainable)
+            mu = 2 * tf.layers.dense(l_a, self.act_dim, tf.nn.sigmoid, trainable=trainable)
             sigma = tf.layers.dense(l_a, self.act_dim, tf.nn.softplus, trainable=trainable)
             norm_dist = tf.distributions.Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
@@ -52,7 +53,7 @@ class APPO_C:
 
     def choose_action(self, s):
         s = s[np.newaxis, :]
-        a = self.sess.run(self.sample_op, {self.tfs: s})[0]
+        a = self.sess.run(self.sample_op, {self.tfs: s})
         #print('action_out_con_before ', a.tolist())
         #a = (np.max(a) - a) / (np.max(a) - np.min(a))
         #print('action_out_con ', a.tolist())
